@@ -13,21 +13,28 @@ struct ContentView: View {
     @State private var activeUploadURL: URL?
     @State private var pickerItem: PhotosPickerItem?
     @State private var showVideoPicker = false
+    @State private var isUploadSessionActive = false
+    @State private var uploadSessionID = UUID()
+
+    private var isVideoPickEnabled: Bool {
+        !isUploadSessionActive
+    }
 
     var body: some View {
         Group {
             if journeyPhase != .home {
                 JourneyRootView(journeyPhase: $journeyPhase)
-            } else if let videoURL = activeUploadURL {
+            } else if isUploadSessionActive {
                 UploadPipelineView(
-                    videoURL: videoURL,
-                    onContinueEditing: { activeUploadURL = nil },
-                    onSave: { activeUploadURL = nil }
+                    videoURL: activeUploadURL,
+                    onContinueEditing: endUploadSession,
+                    onSave: endUploadSession
                 )
-                .id(videoURL)
+                .id(uploadSessionID)
             } else {
                 HomeView(
                     libraryVideos: $libraryVideos,
+                    isVideoPickEnabled: isVideoPickEnabled,
                     onRequestVideoPicker: requestVideoPicker
                 )
             }
@@ -35,23 +42,47 @@ struct ContentView: View {
         .photosPicker(isPresented: $showVideoPicker, selection: $pickerItem, matching: .videos)
         .onChange(of: pickerItem) { _, item in
             guard let item else { return }
+            guard isVideoPickEnabled else {
+                pickerItem = nil
+                return
+            }
+            pickerItem = nil
+            uploadSessionID = UUID()
+            isUploadSessionActive = true
             Task {
                 await importVideo(from: item)
             }
         }
     }
 
+    private func endUploadSession() {
+        activeUploadURL = nil
+        isUploadSessionActive = false
+    }
+
     private func requestVideoPicker() {
+        guard isVideoPickEnabled else { return }
+
         #if os(iOS)
         let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-        if status == .notDetermined {
-            PHPhotoLibrary.requestAuthorization(for: .readWrite) { _ in
+        switch status {
+        case .notDetermined:
+            PHPhotoLibrary.requestAuthorization(for: .readWrite) { newStatus in
                 DispatchQueue.main.async {
-                    showVideoPicker = true
+                    guard isVideoPickEnabled else { return }
+                    if newStatus == .authorized || newStatus == .limited {
+                        showVideoPicker = true
+                    }
                 }
             }
-        } else {
+        case .authorized, .limited:
             showVideoPicker = true
+        case .denied, .restricted:
+            #if DEBUG
+            print("Photo library access denied or restricted")
+            #endif
+        @unknown default:
+            break
         }
         #else
         showVideoPicker = true
@@ -61,21 +92,44 @@ struct ContentView: View {
     private func importVideo(from item: PhotosPickerItem) async {
         do {
             guard let picked = try await item.loadTransferable(type: PickedVideoFile.self) else {
+                await MainActor.run {
+                    endUploadSession()
+                }
                 return
             }
+
+            let sessionURL = picked.url
             await MainActor.run {
-                libraryVideos.append(picked.url)
-                activeUploadURL = picked.url
+                if activeUploadURL == nil {
+                    activeUploadURL = sessionURL
+                    libraryVideos.append(sessionURL)
+                }
             }
-            await MainActor.run {
-                pickerItem = nil
+
+            Task.detached(priority: .utility) {
+                do {
+                    let persisted = try VideoImportService.persistToTemporaryLibrary(from: sessionURL)
+                    await MainActor.run {
+                        guard isUploadSessionActive else { return }
+                        if let index = libraryVideos.firstIndex(of: sessionURL) {
+                            libraryVideos[index] = persisted
+                        }
+                        if activeUploadURL == sessionURL {
+                            activeUploadURL = persisted
+                        }
+                    }
+                } catch {
+                    #if DEBUG
+                    print("Background video persist failed:", error.localizedDescription)
+                    #endif
+                }
             }
         } catch {
             #if DEBUG
             print("Video import failed:", error.localizedDescription)
             #endif
             await MainActor.run {
-                pickerItem = nil
+                endUploadSession()
             }
         }
     }

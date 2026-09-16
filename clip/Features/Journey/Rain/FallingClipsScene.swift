@@ -25,6 +25,13 @@ final class FallingClipsScene: SKScene {
     private let gravityForceScale: CGFloat = 0.28
     private let gravityDeltaWakeThreshold: CGFloat = 0.03
 
+    private var draggedClip: SKNode?
+    private var dragOffset = CGPoint.zero
+    private var isUserDragging = false
+    private var lastDragLocation: CGPoint?
+    private var lastDragTime: TimeInterval?
+    private let maxThrowSpeed: CGFloat = 400
+
     init(size: CGSize, clipURLs: [URL], playfield: PlayfieldPadding) {
         self.clipURLs = clipURLs
         self.playfield = playfield
@@ -135,6 +142,11 @@ final class FallingClipsScene: SKScene {
 
         guard !settledNotified, spawnIndex >= clipURLs.count else { return }
 
+        if isUserDragging {
+            stableTime = 0
+            return
+        }
+
         if clipNodes.isEmpty {
             if sceneElapsed >= 2 {
                 settledNotified = true
@@ -173,6 +185,7 @@ final class FallingClipsScene: SKScene {
     private func clampClipsToPlayfield() {
         let bounds = playfieldBounds()
         for node in clipNodes {
+            if node === draggedClip { continue }
             guard let body = node.physicsBody else { continue }
             let halfW = node.calculateAccumulatedFrame().width / 2
             let halfH = node.calculateAccumulatedFrame().height / 2
@@ -201,6 +214,7 @@ final class FallingClipsScene: SKScene {
         let shouldWake = gravityDelta > gravityDeltaWakeThreshold
 
         for node in clipNodes {
+            if node === draggedClip { continue }
             guard let body = node.physicsBody, body.isDynamic else { continue }
 
             let needsTiltAssist = body.isResting || shouldWake
@@ -227,6 +241,7 @@ final class FallingClipsScene: SKScene {
         let spawnY = bounds.maxY + clipSize.height * 0.55 + CGFloat(spawnIndex) * 10
 
         let container = SKNode()
+        container.name = "fallingClip"
         container.position = CGPoint(x: x, y: spawnY)
 
         let player = AVPlayer(url: url)
@@ -269,6 +284,101 @@ final class FallingClipsScene: SKScene {
         let width = CGFloat.random(in: 100...128)
         let height = width * 0.72
         return CGSize(width: width, height: height)
+    }
+
+    // MARK: - Touch drag
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard draggedClip == nil, let touch = touches.first else { return }
+        let location = touch.location(in: self)
+
+        for node in nodes(at: location) {
+            guard let container = clipContainer(for: node) else { continue }
+            draggedClip = container
+            dragOffset = CGPoint(x: container.position.x - location.x, y: container.position.y - location.y)
+            isUserDragging = true
+            stableTime = 0
+            container.zPosition = 10
+
+            if let body = container.physicsBody {
+                body.isDynamic = false
+                body.velocity = .zero
+                body.angularVelocity = 0
+            }
+
+            lastDragLocation = location
+            lastDragTime = touch.timestamp
+            return
+        }
+    }
+
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard let touch = touches.first, let container = draggedClip else { return }
+        let location = touch.location(in: self)
+        let target = CGPoint(x: location.x + dragOffset.x, y: location.y + dragOffset.y)
+        container.position = clampedPosition(for: container, proposed: target)
+
+        lastDragLocation = location
+        lastDragTime = touch.timestamp
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        endDrag(with: touches.first)
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        endDrag(with: touches.first)
+    }
+
+    private func endDrag(with touch: UITouch?) {
+        guard let container = draggedClip else { return }
+
+        var throwVelocity = CGVector.zero
+        if let touch, let lastLocation = lastDragLocation, let lastTime = lastDragTime {
+            let dt = max(0.016, touch.timestamp - lastTime)
+            let current = touch.location(in: self)
+            let vx = (current.x - lastLocation.x) / CGFloat(dt)
+            let vy = (current.y - lastLocation.y) / CGFloat(dt)
+            let speed = hypot(vx, vy)
+            if speed > 8 {
+                let cap = min(speed, maxThrowSpeed)
+                let scale = cap / speed
+                throwVelocity = CGVector(dx: vx * scale, dy: vy * scale)
+            }
+        }
+
+        container.zPosition = 0
+        if let body = container.physicsBody {
+            body.isDynamic = true
+            body.velocity = throwVelocity
+        }
+
+        draggedClip = nil
+        isUserDragging = false
+        lastDragLocation = nil
+        lastDragTime = nil
+        stableTime = 0
+    }
+
+    private func clipContainer(for node: SKNode) -> SKNode? {
+        var current: SKNode? = node
+        while let candidate = current {
+            if candidate.name == "fallingClip", clipNodes.contains(where: { $0 === candidate }) {
+                return candidate
+            }
+            current = candidate.parent
+        }
+        return nil
+    }
+
+    private func clampedPosition(for node: SKNode, proposed: CGPoint) -> CGPoint {
+        let bounds = playfieldBounds()
+        let halfW = node.calculateAccumulatedFrame().width / 2
+        let halfH = node.calculateAccumulatedFrame().height / 2
+        return CGPoint(
+            x: min(max(proposed.x, bounds.minX + halfW), bounds.maxX - halfW),
+            y: min(max(proposed.y, bounds.minY + halfH), bounds.maxY - halfH)
+        )
     }
 
     private func attachLoopObserver(player: AVPlayer) {

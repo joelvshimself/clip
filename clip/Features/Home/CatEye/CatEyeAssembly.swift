@@ -9,6 +9,7 @@ struct CatEyeAssembly: View {
     let side: CatEyeSide
     let gaze: CGFloat
     let eyeSize: CGSize
+    var blinkAmount: CGFloat = 0
 
     var body: some View {
         let pupilOffset = CatEyeMotion.offset(gaze: gaze, side: side, eyeSize: eyeSize, factor: 1)
@@ -40,6 +41,7 @@ struct CatEyeAssembly: View {
                 }
         }
         .frame(width: eyeSize.width, height: eyeSize.height)
+        .scaleEffect(y: 1 - blinkAmount * 0.92, anchor: .center)
     }
 }
 

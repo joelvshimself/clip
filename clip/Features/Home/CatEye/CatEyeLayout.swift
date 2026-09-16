@@ -71,7 +71,7 @@ enum MagicBeginningLayout {
 enum CatEyeMotion {
     static func offset(gaze: CGFloat, side: CatEyeSide, eyeSize: CGSize, factor: CGFloat = 1) -> CGSize {
         let radians = side.axisAngleDegrees * .pi / 180
-        let travel = eyeSize.width * 0.14 * factor
+        let travel = eyeSize.width * 0.09 * factor
         let arcY = -abs(gaze) * eyeSize.height * 0.04 * factor
         return CGSize(
             width: cos(radians) * gaze * travel,

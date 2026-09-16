@@ -9,22 +9,27 @@ import SwiftUI
 @Observable
 final class CatEyeLookController {
     var gaze: CGFloat = 0
+    var blinkAmount: CGFloat = 0
 
     private var idleTask: Task<Void, Never>?
+
+    private let maxGaze: CGFloat = 0.55
+    private let gazeDuration: TimeInterval = 0.14
+    private let holdDuration: TimeInterval = 0.9
+    private let blinkCloseDuration: TimeInterval = 0.1
+    private let blinkOpenDuration: TimeInterval = 0.08
 
     func startIdleLook() {
         guard idleTask == nil else { return }
         idleTask = Task {
-            gaze = -0.85
+            gaze = -maxGaze
             while !Task.isCancelled {
-                await dart(to: CGFloat.random(in: 0.75...1))
-                try? await Task.sleep(for: .seconds(Double.random(in: 1.1...2.4)))
-                await dart(to: CGFloat.random(in: -1 ... -0.75))
-                try? await Task.sleep(for: .seconds(Double.random(in: 0.9...2.1)))
-                if Bool.random() {
-                    await dart(to: CGFloat.random(in: -0.2...0.2))
-                    try? await Task.sleep(for: .seconds(Double.random(in: 0.35...0.7)))
-                }
+                await moveGaze(to: maxGaze)
+                await blink()
+                try? await Task.sleep(for: .seconds(holdDuration))
+                await moveGaze(to: -maxGaze)
+                await blink()
+                try? await Task.sleep(for: .seconds(holdDuration))
             }
         }
     }
@@ -32,11 +37,24 @@ final class CatEyeLookController {
     func stopIdleLook() {
         idleTask?.cancel()
         idleTask = nil
+        blinkAmount = 0
     }
 
-    private func dart(to target: CGFloat) async {
-        withAnimation(.easeOut(duration: 0.12)) {
+    private func moveGaze(to target: CGFloat) async {
+        withAnimation(.easeOut(duration: gazeDuration)) {
             gaze = target
         }
+        try? await Task.sleep(for: .seconds(gazeDuration))
+    }
+
+    private func blink() async {
+        withAnimation(.easeIn(duration: blinkCloseDuration)) {
+            blinkAmount = 1
+        }
+        try? await Task.sleep(for: .seconds(blinkCloseDuration))
+        withAnimation(.easeOut(duration: blinkOpenDuration)) {
+            blinkAmount = 0
+        }
+        try? await Task.sleep(for: .seconds(blinkOpenDuration))
     }
 }

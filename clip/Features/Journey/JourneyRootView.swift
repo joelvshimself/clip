@@ -157,10 +157,10 @@ struct JourneyRootView: View {
                 .font(.subheadline.weight(.semibold))
         }
         .foregroundStyle(.white)
+        .shadow(color: .black.opacity(0.45), radius: 2, y: 1)
         .padding(.horizontal, 22)
         .padding(.vertical, 11)
-        .glassEffect(.regular, in: .capsule)
-        .shadow(color: .black.opacity(0.28), radius: 12, y: 5)
+        .instructionGlassCapsule()
         .frame(maxHeight: .infinity, alignment: .bottom)
         .padding(.bottom, 36)
     }

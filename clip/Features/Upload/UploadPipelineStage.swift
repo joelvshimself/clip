@@ -12,6 +12,6 @@ enum UploadPipelineStage: Int, CaseIterable {
 }
 
 enum UploadPipelineTiming {
-    static let loadingDuration: TimeInterval = 2.8
+    static let loadingDuration: TimeInterval = 5.0
     static let exportingDuration: TimeInterval = 4.2
 }

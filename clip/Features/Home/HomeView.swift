@@ -7,6 +7,7 @@ import SwiftUI
 
 struct HomeView: View {
     @Binding var libraryVideos: [URL]
+    var isVideoPickEnabled: Bool = true
     var onRequestVideoPicker: () -> Void = {}
 
     private let addTileMarker = URL(fileURLWithPath: "/add-video-tile")
@@ -33,17 +34,23 @@ struct HomeView: View {
 
             MagicBeginningHeroView()
                 .padding(.horizontal, 12)
+                .offset(y: 200)
 
             Spacer(minLength: 8)
 
             Button(action: onRequestVideoPicker) {
                 Text("insert your video")
-                    .font(.headline)
-                    .foregroundStyle(.black)
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.white)
+                    .shadow(color: .black.opacity(0.45), radius: 2, y: 1)
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 18)
-                    .background(Color(white: 0.55), in: RoundedRectangle(cornerRadius: 4))
+                    .instructionGlassRoundedRect(cornerRadius: 14)
             }
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .buttonStyle(.plain)
+            .disabled(!isVideoPickEnabled)
+            .opacity(isVideoPickEnabled ? 1 : 0.45)
             .padding(.horizontal, 36)
             .padding(.bottom, 48)
         }
@@ -130,6 +137,8 @@ struct HomeView: View {
                 }
         }
         .buttonStyle(.plain)
+        .disabled(!isVideoPickEnabled)
+        .opacity(isVideoPickEnabled ? 1 : 0.45)
     }
 
     private func videoTile(url: URL) -> some View {

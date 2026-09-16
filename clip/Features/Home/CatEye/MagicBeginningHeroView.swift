@@ -16,14 +16,14 @@ struct MagicBeginningHeroView: View {
             let width = geometry.size.width
             let height = width / MagicBeginningLayout.aspect
             let size = CGSize(width: width, height: height)
-            let eyeSize = MagicBeginningLayout.eyeSize(for: width)
             let screen = MagicBeginningLayout.screenRect(in: size)
 
             ZStack(alignment: .topLeading) {
-                Image("MagicBeginning")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: width, height: height)
+                MagicBeginningCatFaceView(
+                    width: width,
+                    animateEyes: false,
+                    lookController: lookController
+                )
 
                 if let videoURL {
                     LoopingVideoView(url: videoURL)
@@ -36,12 +36,6 @@ struct MagicBeginningHeroView: View {
                         )
                         .position(x: screen.midX, y: screen.midY)
                 }
-
-                CatEyeAssembly(side: .left, gaze: lookController.gaze, eyeSize: eyeSize)
-                    .position(MagicBeginningLayout.eyeCenter(for: .left, in: size))
-
-                CatEyeAssembly(side: .right, gaze: lookController.gaze, eyeSize: eyeSize)
-                    .position(MagicBeginningLayout.eyeCenter(for: .right, in: size))
             }
             .frame(width: width, height: height)
             .frame(maxWidth: .infinity)
@@ -69,4 +63,3 @@ struct MagicBeginningHeroView: View {
         .padding()
         .background(Color.black)
 }
-

@@ -18,7 +18,6 @@ struct FallingClipsView: View {
                 SpriteView(scene: scene, options: [.allowsTransparency])
                     .frame(width: size.width, height: size.height)
                     .clipped()
-                    .allowsHitTesting(false)
             } else {
                 Color.clear
                     .frame(width: size.width, height: size.height)
