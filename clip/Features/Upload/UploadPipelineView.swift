@@ -8,18 +8,21 @@ import SwiftUI
 
 struct UploadPipelineView: View {
     let videoURL: URL?
+    var previewImage: CGImage?
+    var onEnterExporting: () -> Void = {}
     var onContinueEditing: () -> Void
     var onSave: () -> Void
 
     @State private var stage: UploadPipelineStage = .loading
     @State private var exportSoundPlayer: AVAudioPlayer?
     @State private var stageAutomationStarted = false
+    @State private var loadingStartedAt = Date()
 
     var body: some View {
         ZStack {
             switch stage {
             case .loading:
-                UploadLoadingStageView(videoURL: videoURL)
+                UploadLoadingStageView(previewImage: previewImage)
                     .transition(.opacity)
             case .exporting:
                 UploadExportingStageView()
@@ -39,37 +42,43 @@ struct UploadPipelineView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.black.ignoresSafeArea())
         .onAppear {
+            loadingStartedAt = Date()
             startStageAutomationIfNeeded()
         }
-        .onChange(of: videoURL) { _, newURL in
-            if newURL != nil {
-                startStageAutomationIfNeeded()
-            }
+        .onChange(of: videoURL) { _, _ in
+            startStageAutomationIfNeeded()
         }
         .onChange(of: stage) { _, newStage in
             if newStage == .exporting {
+                onEnterExporting()
                 playExportMemeSound()
             }
         }
     }
 
     private func startStageAutomationIfNeeded() {
-        guard videoURL != nil, !stageAutomationStarted else { return }
+        guard !stageAutomationStarted else { return }
         stageAutomationStarted = true
-        runStageAutomation()
+        Task { @MainActor in
+            await runStageAutomation()
+        }
     }
 
-    private func runStageAutomation() {
-        DispatchQueue.main.asyncAfter(deadline: .now() + UploadPipelineTiming.loadingDuration) {
-            guard stage == .loading, videoURL != nil else { return }
-            stage = .exporting
+    @MainActor
+    private func runStageAutomation() async {
+        let minLoadingEnd = loadingStartedAt.addingTimeInterval(UploadPipelineTiming.loadingDuration)
+
+        while Date() < minLoadingEnd || videoURL == nil {
+            try? await Task.sleep(for: .milliseconds(50))
+            if Task.isCancelled { return }
         }
-        DispatchQueue.main.asyncAfter(
-            deadline: .now() + UploadPipelineTiming.loadingDuration + UploadPipelineTiming.exportingDuration
-        ) {
-            guard stage == .exporting, videoURL != nil else { return }
-            stage = .complete
-        }
+
+        guard stage == .loading else { return }
+        stage = .exporting
+
+        try? await Task.sleep(for: .seconds(UploadPipelineTiming.exportingDuration))
+        guard stage == .exporting, videoURL != nil else { return }
+        stage = .complete
     }
 
     private func playExportMemeSound() {

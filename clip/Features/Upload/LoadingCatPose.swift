@@ -28,7 +28,7 @@ enum LoadingCatTuning {
     static var leftHorizontal: CGFloat = -15
 
     /// LoadingCatRight — push further right (+value adds to X offset).
-    static var rightHorizontal: CGFloat = -22
+    static var rightHorizontal: CGFloat = -36
 
     static func label(anchor: LoadingCatAnchor, topVariantIndex: Int) -> String {
         let tune = LoadingCatFineTune.fromStatic()

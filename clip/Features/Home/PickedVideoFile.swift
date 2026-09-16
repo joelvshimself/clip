@@ -11,17 +11,22 @@ struct PickedVideoFile: Transferable {
     let url: URL
 
     static var transferRepresentation: some TransferRepresentation {
-        sessionFileRepresentation(contentType: .movie, preferredExtension: "mp4")
-        sessionFileRepresentation(contentType: .mpeg4Movie, preferredExtension: "mp4")
-        sessionFileRepresentation(contentType: .quickTimeMovie, preferredExtension: "mov")
-        sessionFileRepresentation(contentType: .video, preferredExtension: "mp4")
-    }
-
-    private static func sessionFileRepresentation(
-        contentType: UTType,
-        preferredExtension: String
-    ) -> some TransferRepresentation {
-        FileRepresentation(contentType: contentType) { video in
+        FileRepresentation(contentType: .movie) { video in
+            SentTransferredFile(video.url)
+        } importing: { received in
+            PickedVideoFile(url: received.file)
+        }
+        FileRepresentation(contentType: .mpeg4Movie) { video in
+            SentTransferredFile(video.url)
+        } importing: { received in
+            PickedVideoFile(url: received.file)
+        }
+        FileRepresentation(contentType: .quickTimeMovie) { video in
+            SentTransferredFile(video.url)
+        } importing: { received in
+            PickedVideoFile(url: received.file)
+        }
+        FileRepresentation(contentType: .video) { video in
             SentTransferredFile(video.url)
         } importing: { received in
             PickedVideoFile(url: received.file)

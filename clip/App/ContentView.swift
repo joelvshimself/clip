@@ -11,6 +11,9 @@ struct ContentView: View {
     @State private var journeyPhase: JourneyPhase = .idle
     @State private var libraryVideos: [URL] = []
     @State private var activeUploadURL: URL?
+    @State private var activeUploadPreviewImage: CGImage?
+    @State private var pendingPersistSourceURL: URL?
+    @State private var persistTaskStarted = false
     @State private var pickerItem: PhotosPickerItem?
     @State private var showVideoPicker = false
     @State private var isUploadSessionActive = false
@@ -27,6 +30,8 @@ struct ContentView: View {
             } else if isUploadSessionActive {
                 UploadPipelineView(
                     videoURL: activeUploadURL,
+                    previewImage: activeUploadPreviewImage,
+                    onEnterExporting: startDeferredPersistIfNeeded,
                     onContinueEditing: endUploadSession,
                     onSave: endUploadSession
                 )
@@ -49,6 +54,10 @@ struct ContentView: View {
             pickerItem = nil
             uploadSessionID = UUID()
             isUploadSessionActive = true
+            persistTaskStarted = false
+            pendingPersistSourceURL = nil
+            activeUploadPreviewImage = nil
+            activeUploadURL = nil
             Task {
                 await importVideo(from: item)
             }
@@ -57,6 +66,9 @@ struct ContentView: View {
 
     private func endUploadSession() {
         activeUploadURL = nil
+        activeUploadPreviewImage = nil
+        pendingPersistSourceURL = nil
+        persistTaskStarted = false
         isUploadSessionActive = false
     }
 
@@ -89,7 +101,42 @@ struct ContentView: View {
         #endif
     }
 
+    private func startDeferredPersistIfNeeded() {
+        guard !persistTaskStarted, let sourceURL = pendingPersistSourceURL else { return }
+        persistTaskStarted = true
+        pendingPersistSourceURL = nil
+
+        Task.detached(priority: .utility) {
+            do {
+                let persisted = try VideoImportService.persistToTemporaryLibrary(from: sourceURL)
+                await MainActor.run {
+                    guard isUploadSessionActive else { return }
+                    if let index = libraryVideos.firstIndex(of: sourceURL) {
+                        libraryVideos[index] = persisted
+                    }
+                    if activeUploadURL == sourceURL {
+                        activeUploadURL = persisted
+                    }
+                }
+            } catch {
+                #if DEBUG
+                print("Deferred video persist failed:", error.localizedDescription)
+                #endif
+            }
+        }
+    }
+
     private func importVideo(from item: PhotosPickerItem) async {
+        let thumbnailTask = Task {
+            await UploadVideoThumbnailLoader.loadPreview(from: item)
+        }
+
+        Task { @MainActor in
+            if let image = await thumbnailTask.value {
+                activeUploadPreviewImage = image
+            }
+        }
+
         do {
             guard let picked = try await item.loadTransferable(type: PickedVideoFile.self) else {
                 await MainActor.run {
@@ -102,26 +149,8 @@ struct ContentView: View {
             await MainActor.run {
                 if activeUploadURL == nil {
                     activeUploadURL = sessionURL
+                    pendingPersistSourceURL = sessionURL
                     libraryVideos.append(sessionURL)
-                }
-            }
-
-            Task.detached(priority: .utility) {
-                do {
-                    let persisted = try VideoImportService.persistToTemporaryLibrary(from: sessionURL)
-                    await MainActor.run {
-                        guard isUploadSessionActive else { return }
-                        if let index = libraryVideos.firstIndex(of: sessionURL) {
-                            libraryVideos[index] = persisted
-                        }
-                        if activeUploadURL == sessionURL {
-                            activeUploadURL = persisted
-                        }
-                    }
-                } catch {
-                    #if DEBUG
-                    print("Background video persist failed:", error.localizedDescription)
-                    #endif
                 }
             }
         } catch {

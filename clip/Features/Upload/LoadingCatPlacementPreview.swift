@@ -7,10 +7,11 @@ import SwiftUI
 
 struct LoadingCatPlacementContent: View {
     var containerWidth: CGFloat
-    var videoURL: URL?
+    var previewImage: CGImage?
     var anchor: LoadingCatAnchor
     var topVariantIndex: Int
     var catOpacity: Double = 1
+    var catPixelAmount: Double = 0
     var showTuningLabel: Bool = false
     var tuning: LoadingCatFineTune? = nil
 
@@ -34,7 +35,7 @@ struct LoadingCatPlacementContent: View {
 
             ZStack {
                 videoPreview(
-                    url: videoURL,
+                    previewImage: previewImage,
                     width: videoWidth,
                     height: videoHeight
                 )
@@ -45,6 +46,10 @@ struct LoadingCatPlacementContent: View {
                     .frame(width: catSize.width, height: catSize.height)
                     .offset(x: catOffset.width, y: catOffset.height)
                     .opacity(catOpacity)
+                    .layerEffect(
+                        LoadingCatPixelation.shader(amount: catPixelAmount),
+                        maxSampleOffset: LoadingCatPixelation.maxSampleOffset
+                    )
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
@@ -66,34 +71,21 @@ struct LoadingCatPlacementContent: View {
     }
 
     @ViewBuilder
-    private func videoPreview(url: URL?, width: CGFloat, height: CGFloat) -> some View {
+    private func videoPreview(previewImage: CGImage?, width: CGFloat, height: CGFloat) -> some View {
         let shape = RoundedRectangle(cornerRadius: 6, style: .continuous)
-        if let url {
-            LoopingVideoView(url: url, previewLoopDuration: 3)
-                .frame(width: width, height: height)
-                .clipShape(shape)
-                .overlay {
-                    shape.stroke(Color.white.opacity(0.12), lineWidth: 1)
-                }
-        } else {
-            shape
-                .fill(Color(white: 0.18))
-                .frame(width: width, height: height)
-                .overlay {
-                    shape.stroke(Color.white.opacity(0.12), lineWidth: 1)
-                }
-                .overlay {
-                    ProgressView()
-                        .tint(.white.opacity(0.85))
-                }
-        }
+        UploadVideoLoadingPreviewView(previewImage: previewImage)
+            .frame(width: width, height: height)
+            .clipShape(shape)
+            .overlay {
+                shape.stroke(Color.white.opacity(0.12), lineWidth: 1)
+            }
     }
 }
 
 struct LoadingCatPlacementView: View {
     var anchor: LoadingCatAnchor
     var topVariantIndex: Int = 0
-    var videoURL: URL = PreviewSupport.sampleVideoURL
+    var previewImage: CGImage? = nil
 
     @State private var tuning = LoadingCatFineTune.fromStatic()
     @State private var previewDown: Double = 0
@@ -104,7 +96,7 @@ struct LoadingCatPlacementView: View {
             GeometryReader { geometry in
                 LoadingCatPlacementContent(
                     containerWidth: geometry.size.width,
-                    videoURL: videoURL,
+                    previewImage: previewImage,
                     anchor: anchor,
                     topVariantIndex: topVariantIndex,
                     showTuningLabel: true,
@@ -197,7 +189,7 @@ struct LoadingCatPlacementView: View {
 // MARK: - Tuning lab (all assets + copy snippet)
 
 struct LoadingCatTuningLabView: View {
-    var videoURL: URL = PreviewSupport.sampleVideoURL
+    var previewImage: CGImage? = nil
 
     @State private var tuning = LoadingCatFineTune.fromStatic()
     @State private var previewAnchor: LoadingCatAnchor = .top
@@ -208,7 +200,7 @@ struct LoadingCatTuningLabView: View {
             GeometryReader { geometry in
                 LoadingCatPlacementContent(
                     containerWidth: geometry.size.width,
-                    videoURL: videoURL,
+                    previewImage: previewImage,
                     anchor: previewAnchor,
                     topVariantIndex: previewTopIndex,
                     showTuningLabel: true,
