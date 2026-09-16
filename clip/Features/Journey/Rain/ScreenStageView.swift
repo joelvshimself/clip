@@ -53,3 +53,13 @@ struct ScreenStageView: View {
         }
     }
 }
+
+#Preview {
+    ScreenStageView(
+        containerSize: PreviewSupport.phoneSize,
+        showCTA: true,
+        onCTA: {},
+        onSettled: {}
+    )
+    .background(Color.black)
+}

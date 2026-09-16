@@ -9,7 +9,8 @@ import SwiftUI
 struct JourneyRootView: View {
     @Binding var journeyPhase: JourneyPhase
 
-    @State private var scrollProgress: CGFloat = 0
+    @State private var revealProgress: CGFloat = 0
+    @State private var pinchAnchor: CGFloat = 1
     @State private var isFullyOpen = false
     @State private var hintBounce = false
     @State private var catLaunched = false
@@ -19,7 +20,8 @@ struct JourneyRootView: View {
     @State private var showJourneyCTA = false
 
     private var openAmount: CGFloat {
-        isFullyOpen ? 1 : scrollProgress * RevealArt.manualOpenCap
+        if isFullyOpen { return 1 }
+        return min(1, revealProgress * RevealArt.manualOpenCap)
     }
 
     private var journeyActive: Bool {
@@ -36,8 +38,6 @@ struct JourneyRootView: View {
             let height = geometry.size.height
             let arribaHeight = width * RevealArt.arribaAspect
             let abajoHeight = width * RevealArt.abajoAspect
-            let scrollRange = height * (RevealArt.scrollContentMultiplier - 1)
-
             ZStack {
                 Color.black
 
@@ -89,19 +89,9 @@ struct JourneyRootView: View {
                         .allowsHitTesting(false)
                 }
 
-                if !journeyActive {
-                    ScrollView {
-                        Color.clear
-                            .frame(height: height * RevealArt.scrollContentMultiplier)
-                    }
-                    .scrollIndicators(.hidden)
-                    .onScrollGeometryChange(for: CGFloat.self) { geometry in
-                        geometry.contentOffset.y + geometry.contentInsets.top
-                    } action: { _, offset in
-                        handleScroll(offset: offset, scrollRange: scrollRange)
-                    }
-                }
             }
+            .contentShape(Rectangle())
+            .gesture(pinchOpenGesture)
         }
         .ignoresSafeArea()
         .animation(.easeInOut(duration: 0.35), value: journeyPhase)
@@ -143,13 +133,27 @@ struct JourneyRootView: View {
             .allowsHitTesting(false)
     }
 
+    private var pinchOpenGesture: some Gesture {
+        MagnificationGesture()
+            .onChanged { magnification in
+                guard !journeyActive else { return }
+                let scale = pinchAnchor * magnification
+                handlePinch(scale: scale, ended: false)
+            }
+            .onEnded { magnification in
+                guard !journeyActive else { return }
+                pinchAnchor = clampedPinchScale(pinchAnchor * magnification)
+                handlePinch(scale: pinchAnchor, ended: true)
+            }
+    }
+
     private var scrollHint: some View {
         HStack(spacing: 8) {
-            Image(systemName: "chevron.down")
-                .font(.caption.weight(.bold))
-                .offset(y: hintBounce ? 5 : -3)
+            Image(systemName: "hand.pinch.fill")
+                .font(.subheadline.weight(.semibold))
+                .scaleEffect(hintBounce ? 1.12 : 0.92)
 
-            Text("scroll")
+            Text("pinch to open")
                 .font(.subheadline.weight(.semibold))
         }
         .foregroundStyle(.white)
@@ -162,23 +166,52 @@ struct JourneyRootView: View {
     }
 
     private var hintOpacity: Double {
-        Double(max(0, 1 - scrollProgress * 2.5))
+        Double(max(0, 1 - revealProgress * 2.5))
     }
 
-    private func handleScroll(offset: CGFloat, scrollRange: CGFloat) {
-        guard scrollRange > 0, !journeyStarted else { return }
+    private func clampedPinchScale(_ scale: CGFloat) -> CGFloat {
+        let minScale = RevealArt.pinchBaseline
+        let maxScale = RevealArt.pinchBaseline + RevealArt.pinchFullSpan
+        return min(max(scale, minScale), maxScale)
+    }
 
-        let rawProgress = min(max(offset / scrollRange, 0), 1)
+    private func progress(fromPinchScale scale: CGFloat) -> CGFloat {
+        let raw = (scale - RevealArt.pinchBaseline) / RevealArt.pinchFullSpan
+        return min(max(raw, 0), 1)
+    }
 
-        if rawProgress >= RevealArt.snapThreshold, !isFullyOpen {
-            withAnimation(.easeIn(duration: RevealArt.snapDuration)) {
-                isFullyOpen = true
+    private func handlePinch(scale: CGFloat, ended: Bool) {
+        guard !journeyStarted, !isFullyOpen else { return }
+
+        let clamped = clampedPinchScale(scale)
+        let rawProgress = progress(fromPinchScale: clamped)
+
+        if ended {
+            pinchAnchor = clamped
+            if rawProgress >= RevealArt.snapThreshold {
+                commitFullOpen()
+            } else {
+                withAnimation(.easeOut(duration: RevealArt.pinchFollowDuration)) {
+                    revealProgress = rawProgress
+                }
             }
-        } else if rawProgress < RevealArt.snapReleaseThreshold, isFullyOpen {
-            isFullyOpen = false
+            return
         }
 
-        scrollProgress = rawProgress
+        withAnimation(.easeOut(duration: RevealArt.pinchFollowDuration)) {
+            revealProgress = rawProgress
+        }
+    }
+
+    private func commitFullOpen() {
+        pinchAnchor = RevealArt.pinchBaseline + RevealArt.pinchFullSpan
+        withAnimation(.easeIn(duration: RevealArt.snapDuration)) {
+            revealProgress = RevealArt.revealProgressForFullOpen
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + RevealArt.snapDuration) {
+            guard !journeyStarted else { return }
+            isFullyOpen = true
+        }
     }
 
     private func startJourney() {
@@ -233,4 +266,9 @@ struct JourneyRootView: View {
         journeyPhase = .home
         #endif
     }
+}
+
+#Preview("Journey Reveal") {
+    @Previewable @State var phase: JourneyPhase = .idle
+    JourneyRootView(journeyPhase: $phase)
 }

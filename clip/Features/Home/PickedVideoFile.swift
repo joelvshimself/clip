@@ -19,5 +19,21 @@ struct PickedVideoFile: Transferable {
             try FileManager.default.copyItem(at: received.file, to: destination)
             return PickedVideoFile(url: destination)
         }
+        FileRepresentation(contentType: .mpeg4Movie) { video in
+            SentTransferredFile(video.url)
+        } importing: { received in
+            let destination = FileManager.default.temporaryDirectory
+                .appendingPathComponent("\(UUID().uuidString).mp4")
+            try FileManager.default.copyItem(at: received.file, to: destination)
+            return PickedVideoFile(url: destination)
+        }
+        FileRepresentation(contentType: .quickTimeMovie) { video in
+            SentTransferredFile(video.url)
+        } importing: { received in
+            let destination = FileManager.default.temporaryDirectory
+                .appendingPathComponent("\(UUID().uuidString).mov")
+            try FileManager.default.copyItem(at: received.file, to: destination)
+            return PickedVideoFile(url: destination)
+        }
     }
 }

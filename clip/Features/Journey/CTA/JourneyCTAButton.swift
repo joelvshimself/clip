@@ -32,3 +32,10 @@ struct JourneyCTAButton: View {
         }
     }
 }
+
+#Preview {
+    ZStack {
+        Color.black.ignoresSafeArea()
+        JourneyCTAButton()
+    }
+}

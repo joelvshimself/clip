@@ -68,3 +68,9 @@ struct LoopingVideoView: View {
     }
 }
 #endif
+
+#Preview {
+    LoopingVideoView(url: PreviewSupport.sampleVideoURL)
+        .frame(width: 200, height: 280)
+        .clipShape(RoundedRectangle(cornerRadius: 8))
+}

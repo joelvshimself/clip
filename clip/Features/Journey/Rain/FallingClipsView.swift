@@ -37,3 +37,8 @@ struct FallingClipsView: View {
         }
     }
 }
+
+#Preview {
+    FallingClipsView(size: CGSize(width: 300, height: 420), onSettled: {})
+        .background(Color.black)
+}

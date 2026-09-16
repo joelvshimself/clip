@@ -97,3 +97,18 @@ struct AlphaVideoPlayer: View {
     }
 }
 #endif
+
+#Preview("Explosion") {
+    Group {
+        if let url = PreviewSupport.sampleExplosionURL {
+            AlphaVideoPlayer(url: url)
+                .frame(width: 320, height: 480)
+                .background(Color.black)
+        } else {
+            Text("explosion.mov not in bundle")
+                .foregroundStyle(.white)
+                .frame(width: 320, height: 480)
+                .background(Color.black)
+        }
+    }
+}

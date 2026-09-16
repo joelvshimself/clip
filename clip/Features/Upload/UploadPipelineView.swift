@@ -34,7 +34,7 @@ struct UploadPipelineView: View {
         }
         .animation(.easeInOut(duration: 0.45), value: stage)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color(white: stage == .loading ? 0.92 : 0.05).ignoresSafeArea())
+        .background(Color.black.ignoresSafeArea())
         .onAppear {
             runStageAutomation()
         }
@@ -71,40 +71,15 @@ struct UploadPipelineView: View {
 
 private struct UploadLoadingStageView: View {
     let videoURL: URL
-    @State private var catBounce = false
 
     var body: some View {
         VStack(spacing: 0) {
-            Spacer()
+            Spacer(minLength: 24)
 
-            ZStack(alignment: .top) {
-                RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(Color(white: 0.55))
-                    .aspectRatio(0.72, contentMode: .fit)
-                    .overlay {
-                        LoopingVideoView(url: videoURL)
-                            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
-                    }
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .stroke(Color.black.opacity(0.12), lineWidth: 1)
-                    }
+            MagicBeginningHeroView(videoURL: videoURL)
+                .padding(.horizontal, 16)
 
-                Image("Cat")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 120)
-                    .offset(y: catBounce ? -58 : -48)
-                    .shadow(color: .black.opacity(0.2), radius: 8, y: 4)
-            }
-            .padding(.horizontal, 40)
-
-            Spacer()
-        }
-        .onAppear {
-            withAnimation(.easeInOut(duration: 0.55).repeatForever(autoreverses: true)) {
-                catBounce = true
-            }
+            Spacer(minLength: 24)
         }
     }
 }
@@ -250,4 +225,36 @@ private struct UploadCompleteStageView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.black.ignoresSafeArea())
     }
+}
+
+#Preview("Upload Pipeline") {
+    UploadPipelineView(
+        videoURL: PreviewSupport.sampleVideoURL,
+        onContinueEditing: {},
+        onSave: {}
+    )
+}
+
+#Preview("Stage Loading") {
+    UploadLoadingStageView(videoURL: PreviewSupport.sampleVideoURL)
+        .background(Color.black)
+}
+
+#Preview("Stage Exporting") {
+    UploadExportingStageView()
+}
+
+#Preview("Cricket Ball") {
+    CricketBallView()
+        .frame(width: 64, height: 64)
+        .padding()
+        .background(Color.black)
+}
+
+#Preview("Stage Complete") {
+    UploadCompleteStageView(
+        videoURL: PreviewSupport.sampleVideoURL,
+        onContinueEditing: {},
+        onSave: {}
+    )
 }

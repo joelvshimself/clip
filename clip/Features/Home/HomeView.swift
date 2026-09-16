@@ -3,21 +3,17 @@
 //  clip
 //
 
-import Photos
-import PhotosUI
 import SwiftUI
 
 struct HomeView: View {
     @Binding var libraryVideos: [URL]
-    var onVideoUploaded: (URL) -> Void = { _ in }
-    @State private var pickerItem: PhotosPickerItem?
-    @State private var showVideoPicker = false
+    var onRequestVideoPicker: () -> Void = {}
 
     private let addTileMarker = URL(fileURLWithPath: "/add-video-tile")
 
     var body: some View {
         ZStack {
-            Color(white: 0.92)
+            Color.black
                 .ignoresSafeArea()
 
             if libraryVideos.isEmpty {
@@ -26,33 +22,21 @@ struct HomeView: View {
                 filledHome
             }
         }
-        .photosPicker(isPresented: $showVideoPicker, selection: $pickerItem, matching: .videos)
-        .onChange(of: pickerItem) { _, item in
-            guard let item else { return }
-            Task { await importVideo(from: item) }
-        }
     }
 
     private var emptyHome: some View {
-        VStack(spacing: 28) {
+        VStack(spacing: 20) {
             Text("Let the magic begin")
                 .font(.title2.weight(.semibold))
-                .foregroundStyle(.black)
-                .padding(.top, 48)
+                .foregroundStyle(.white)
+                .padding(.top, 20)
 
-            Spacer()
+            MagicBeginningHeroView()
+                .padding(.horizontal, 12)
 
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(Color(white: 0.55))
-                .aspectRatio(0.72, contentMode: .fit)
-                .overlay {
-                    Text("{video}")
-                        .font(.title3.weight(.medium))
-                        .foregroundStyle(.black.opacity(0.85))
-                }
-                .padding(.horizontal, 36)
+            Spacer(minLength: 8)
 
-            Button(action: openVideoPicker) {
+            Button(action: onRequestVideoPicker) {
                 Text("insert your video")
                     .font(.headline)
                     .foregroundStyle(.black)
@@ -133,7 +117,7 @@ struct HomeView: View {
     }
 
     private var addVideoTile: some View {
-        Button(action: openVideoPicker) {
+        Button(action: onRequestVideoPicker) {
             RoundedRectangle(cornerRadius: 4, style: .continuous)
                 .fill(Color(white: 0.78))
                 .frame(height: 140)
@@ -172,28 +156,14 @@ struct HomeView: View {
         }
         return columns
     }
+}
 
-    private func openVideoPicker() {
-        #if os(iOS)
-        let status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
-        if status == .notDetermined {
-            PHPhotoLibrary.requestAuthorization(for: .readWrite) { _ in
-                DispatchQueue.main.async { showVideoPicker = true }
-            }
-        } else {
-            showVideoPicker = true
-        }
-        #else
-        showVideoPicker = true
-        #endif
-    }
+#Preview("Home Empty") {
+    @Previewable @State var videos: [URL] = []
+    HomeView(libraryVideos: $videos)
+}
 
-    private func importVideo(from item: PhotosPickerItem) async {
-        guard let picked = try? await item.loadTransferable(type: PickedVideoFile.self) else { return }
-        await MainActor.run {
-            libraryVideos.append(picked.url)
-            pickerItem = nil
-            onVideoUploaded(picked.url)
-        }
-    }
+#Preview("Home Filled") {
+    @Previewable @State var videos: [URL] = FallingClipCatalog.urls
+    HomeView(libraryVideos: $videos)
 }
