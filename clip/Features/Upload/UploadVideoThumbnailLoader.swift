@@ -23,7 +23,7 @@ enum UploadVideoThumbnailLoader {
 
         return await withCheckedContinuation { continuation in
             let options = PHImageRequestOptions()
-            options.deliveryMode = .fastFormat
+            options.deliveryMode = .opportunistic
             options.resizeMode = .fast
             options.isNetworkAccessAllowed = true
             options.isSynchronous = false
@@ -35,8 +35,8 @@ enum UploadVideoThumbnailLoader {
                 contentMode: .aspectFill,
                 options: options
             ) { image, info in
-                guard !resumed else { return }
                 if let error = info?[PHImageErrorKey] as? Error {
+                    guard !resumed else { return }
                     resumed = true
                     continuation.resume(returning: nil)
                     #if DEBUG
@@ -45,11 +45,13 @@ enum UploadVideoThumbnailLoader {
                     return
                 }
                 if info?[PHImageCancelledKey] as? Bool == true {
+                    guard !resumed else { return }
                     resumed = true
                     continuation.resume(returning: nil)
                     return
                 }
                 guard let image, let cgImage = image.cgImage else { return }
+                guard !resumed else { return }
                 resumed = true
                 continuation.resume(returning: cgImage)
             }

@@ -3,11 +3,17 @@
 //  clip
 //
 
+import CoreGraphics
 import SwiftUI
 
 struct HomeView: View {
     @Binding var libraryVideos: [URL]
     var isVideoPickEnabled: Bool = true
+    var isVideoHandoffActive: Bool = false
+    var handoffPreviewImage: CGImage?
+    var handoffVideoURL: URL?
+    var onHandoffPreviewResolved: (CGImage) -> Void = { _ in }
+    var onVideoHandoffFinished: () -> Void = {}
     var onRequestVideoPicker: () -> Void = {}
 
     private let addTileMarker = URL(fileURLWithPath: "/add-video-tile")
@@ -17,7 +23,7 @@ struct HomeView: View {
             Color.black
                 .ignoresSafeArea()
 
-            if libraryVideos.isEmpty {
+            if libraryVideos.isEmpty || isVideoHandoffActive {
                 emptyHome
             } else {
                 filledHome
@@ -28,31 +34,40 @@ struct HomeView: View {
     private var emptyHome: some View {
         VStack(spacing: 20) {
             Text("Let the magic begin")
-                .font(.title2.weight(.semibold))
+                .font(MagicBeginningTypography.titleFont)
                 .foregroundStyle(.white)
+                .minimumScaleFactor(0.7)
+                .lineLimit(1)
+                .padding(.horizontal, 20)
                 .padding(.top, 20)
 
-            MagicBeginningHeroView()
-                .padding(.horizontal, 12)
-                .offset(y: 200)
+            Group {
+                if isVideoHandoffActive {
+                    MagicBeginningHandoffView(
+                        previewImage: handoffPreviewImage,
+                        videoURL: handoffVideoURL,
+                        onPreviewResolved: onHandoffPreviewResolved,
+                        onFinished: onVideoHandoffFinished
+                    )
+                } else {
+                    MagicBeginningHeroView()
+                }
+            }
+            .padding(.horizontal, 12)
 
             Spacer(minLength: 8)
 
-            Button(action: onRequestVideoPicker) {
-                Text("insert your video")
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .shadow(color: .black.opacity(0.45), radius: 2, y: 1)
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 18)
-                    .instructionGlassRoundedRect(cornerRadius: 14)
-            }
+            PrimaryGlassButton(
+                title: "insert your video",
+                shape: .roundedRect(cornerRadius: 14),
+                isEnabled: isVideoPickEnabled,
+                action: onRequestVideoPicker
+            )
             .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .buttonStyle(.plain)
-            .disabled(!isVideoPickEnabled)
-            .opacity(isVideoPickEnabled ? 1 : 0.45)
             .padding(.horizontal, 36)
             .padding(.bottom, 48)
+            .opacity(isVideoHandoffActive ? 0 : 1)
+            .allowsHitTesting(!isVideoHandoffActive)
         }
     }
 

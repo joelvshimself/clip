@@ -11,6 +11,7 @@ struct JourneyRootView: View {
 
     @State private var revealProgress: CGFloat = 0
     @State private var pinchAnchor: CGFloat = 1
+    @State private var scrollRevealAnchor: CGFloat = 0
     @State private var isFullyOpen = false
     @State private var hintBounce = false
     @State private var catLaunched = false
@@ -48,6 +49,7 @@ struct JourneyRootView: View {
                     AlphaVideoPlayer(url: explosionURL) {
                         startManifestoFlashes()
                     }
+                    .id(explosionURL)
                     .frame(width: width, height: height)
                     .clipped()
                     .allowsHitTesting(false)
@@ -101,7 +103,7 @@ struct JourneyRootView: View {
 
             }
             .contentShape(Rectangle())
-            .gesture(pinchOpenGesture)
+            .gesture(openRevealGesture)
         }
         .ignoresSafeArea()
         .animation(.easeInOut(duration: 0.35), value: journeyPhase)
@@ -114,6 +116,7 @@ struct JourneyRootView: View {
         .onChange(of: journeyPhase) { _, phase in
             if phase == .home || phase == .idle {
                 DeviceTiltMonitor.shared.stop()
+                JourneyAudio.stopAll()
             }
         }
         .onAppear {
@@ -123,6 +126,7 @@ struct JourneyRootView: View {
         }
         .onDisappear {
             DeviceTiltMonitor.shared.stop()
+            JourneyAudio.stopAll()
         }
     }
 
@@ -141,17 +145,37 @@ struct JourneyRootView: View {
             .allowsHitTesting(false)
     }
 
+    private var openRevealGesture: some Gesture {
+        pinchOpenGesture.simultaneously(with: scrollOpenGesture)
+    }
+
     private var pinchOpenGesture: some Gesture {
         MagnificationGesture()
             .onChanged { magnification in
                 guard !journeyActive else { return }
                 let scale = pinchAnchor * magnification
-                handlePinch(scale: scale, ended: false)
+                let rawProgress = progress(fromPinchScale: clampedPinchScale(scale))
+                handleRevealProgress(rawProgress, ended: false)
             }
             .onEnded { magnification in
                 guard !journeyActive else { return }
                 pinchAnchor = clampedPinchScale(pinchAnchor * magnification)
-                handlePinch(scale: pinchAnchor, ended: true)
+                let rawProgress = progress(fromPinchScale: pinchAnchor)
+                handleRevealProgress(rawProgress, ended: true)
+            }
+    }
+
+    private var scrollOpenGesture: some Gesture {
+        DragGesture(minimumDistance: 10)
+            .onChanged { value in
+                guard !journeyActive else { return }
+                let rawProgress = progress(fromScrollTranslation: value.translation.height)
+                handleRevealProgress(rawProgress, ended: false)
+            }
+            .onEnded { value in
+                guard !journeyActive else { return }
+                let rawProgress = progress(fromScrollTranslation: value.translation.height)
+                handleRevealProgress(rawProgress, ended: true)
             }
     }
 
@@ -188,41 +212,60 @@ struct JourneyRootView: View {
         return min(max(raw, 0), 1)
     }
 
-    private func handlePinch(scale: CGFloat, ended: Bool) {
+    private func progress(fromScrollTranslation translationY: CGFloat) -> CGFloat {
+        let raw = scrollRevealAnchor - translationY / RevealArt.scrollDistanceForFullOpen
+        return min(max(raw, 0), 1)
+    }
+
+    private func handleRevealProgress(_ rawProgress: CGFloat, ended: Bool) {
         guard !journeyStarted, !isFullyOpen else { return }
 
-        let clamped = clampedPinchScale(scale)
-        let rawProgress = progress(fromPinchScale: clamped)
+        let progress = min(max(rawProgress, 0), 1)
 
         if ended {
-            pinchAnchor = clamped
-            if rawProgress >= RevealArt.snapThreshold {
+            scrollRevealAnchor = progress
+            pinchAnchor = RevealArt.pinchBaseline + progress * RevealArt.pinchFullSpan
+            if progress >= RevealArt.snapThreshold {
+                prewarmExplosionIfNeeded()
                 commitFullOpen()
             } else {
                 withAnimation(.easeOut(duration: RevealArt.pinchFollowDuration)) {
-                    revealProgress = rawProgress
+                    revealProgress = progress
                 }
             }
             return
         }
 
+        if progress >= RevealArt.explosionPrewarmProgress {
+            prewarmExplosionIfNeeded()
+        }
+
         withAnimation(.easeOut(duration: RevealArt.pinchFollowDuration)) {
-            revealProgress = rawProgress
+            revealProgress = progress
         }
     }
 
+    private func prewarmExplosionIfNeeded() {
+        guard !journeyStarted, let url = FallingClipCatalog.explosionURL else { return }
+        ExplosionPlaybackCache.prewarm(url: url)
+    }
+
     private func commitFullOpen() {
+        startJourney()
+        JourneyAudio.prepareSession()
+        JourneyAudio.play(.curtainSnap)
         pinchAnchor = RevealArt.pinchBaseline + RevealArt.pinchFullSpan
+        scrollRevealAnchor = 1
         withAnimation(.easeIn(duration: RevealArt.snapDuration)) {
             revealProgress = RevealArt.revealProgressForFullOpen
         }
         DispatchQueue.main.asyncAfter(deadline: .now() + RevealArt.snapDuration) {
-            guard !journeyStarted else { return }
             isFullyOpen = true
         }
     }
 
     private func startJourney() {
+        JourneyAudio.prepareSession()
         journeyStarted = true
         journeyPhase = .blast
         withAnimation(.easeOut(duration: JourneyTiming.catLaunchDuration)) {
@@ -252,6 +295,9 @@ struct JourneyRootView: View {
     }
 
     private func revealCTA() {
+        if !showJourneyCTA {
+            JourneyAudio.play(.ctaResolve)
+        }
         showJourneyCTA = true
         if journeyPhase == .rain {
             journeyPhase = .cta
@@ -263,10 +309,12 @@ struct JourneyRootView: View {
         PHPhotoLibrary.requestAuthorization(for: .readWrite) { _ in
             DispatchQueue.main.async {
                 DeviceTiltMonitor.shared.stop()
+                JourneyAudio.stopAll()
                 journeyPhase = .home
             }
         }
         #else
+        JourneyAudio.stopAll()
         journeyPhase = .home
         #endif
     }

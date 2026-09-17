@@ -52,22 +52,15 @@ struct UploadCompleteStageView: View {
                         .foregroundStyle(.white)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 16)
-                        .overlay {
-                            RoundedRectangle(cornerRadius: 6, style: .continuous)
-                                .stroke(Color.white.opacity(0.85), lineWidth: 2)
-                        }
+                        .instructionGlassOutlineRoundedRect(cornerRadius: 6)
                 }
                 .buttonStyle(.plain)
 
-                Button(action: onSave) {
-                    Text("Save")
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.black.opacity(0.85))
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .background(Color(white: 0.72), in: RoundedRectangle(cornerRadius: 6, style: .continuous))
-                }
-                .buttonStyle(.plain)
+                PrimaryGlassButton(
+                    title: "Save",
+                    shape: .roundedRect(cornerRadius: 6),
+                    action: onSave
+                )
             }
             .padding(.horizontal, 24)
             .padding(.bottom, 48)

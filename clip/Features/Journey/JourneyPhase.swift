@@ -22,5 +22,5 @@ enum JourneyTiming {
     static let waitAfterExplosion: TimeInterval = 2
     static let waitAfterSettled: TimeInterval = 2
     static let catLaunchDuration: TimeInterval = 0.45
-    static let ctaBackupDelay: TimeInterval = 7
+    static let ctaBackupDelay: TimeInterval = 16
 }

@@ -19,7 +19,10 @@ struct AlphaVideoPlayer: UIViewRepresentable {
         return view
     }
 
-    func updateUIView(_ uiView: PlayerUIView, context: Context) {}
+    func updateUIView(_ uiView: PlayerUIView, context: Context) {
+        context.coordinator.onFinished = onFinished
+        uiView.configure(url: url, coordinator: context.coordinator)
+    }
 
     func makeCoordinator() -> Coordinator {
         Coordinator(onFinished: onFinished)
@@ -28,34 +31,60 @@ struct AlphaVideoPlayer: UIViewRepresentable {
     final class Coordinator: NSObject {
         var onFinished: (() -> Void)?
         private var endObserver: NSObjectProtocol?
+        private var statusObserver: NSKeyValueObservation?
+        private var didFinish = false
 
         init(onFinished: (() -> Void)?) {
             self.onFinished = onFinished
         }
 
-        func observeEnd(of item: AVPlayerItem, player: AVPlayer) {
+        func observeItem(_ item: AVPlayerItem, player: AVPlayer) {
             if let endObserver {
                 NotificationCenter.default.removeObserver(endObserver)
             }
+            statusObserver?.invalidate()
+            didFinish = false
+
             endObserver = NotificationCenter.default.addObserver(
                 forName: .AVPlayerItemDidPlayToEndTime,
                 object: item,
                 queue: .main
             ) { [weak self] _ in
-                self?.onFinished?()
+                self?.finishOnce()
             }
-            player.play()
+
+            statusObserver = item.observe(\.status, options: [.initial, .new]) { [weak self] item, _ in
+                guard let self else { return }
+                DispatchQueue.main.async {
+                    switch item.status {
+                    case .readyToPlay:
+                        player.play()
+                    case .failed:
+                        self.finishOnce()
+                    default:
+                        break
+                    }
+                }
+            }
+        }
+
+        func finishOnce() {
+            guard !didFinish else { return }
+            didFinish = true
+            onFinished?()
         }
 
         deinit {
             if let endObserver {
                 NotificationCenter.default.removeObserver(endObserver)
             }
+            statusObserver?.invalidate()
         }
     }
 
     final class PlayerUIView: UIView {
         private let playerLayer = AVPlayerLayer()
+        private var currentURL: URL?
 
         override init(frame: CGRect) {
             super.init(frame: frame)
@@ -76,11 +105,19 @@ struct AlphaVideoPlayer: UIViewRepresentable {
         }
 
         func configure(url: URL, coordinator: Coordinator) {
-            let item = AVPlayerItem(url: url)
+            guard currentURL != url else { return }
+            currentURL = url
+
+            JourneyAudio.prepareSession()
+
+            let item = ExplosionPlaybackCache.playerItem(for: url)
             let player = AVPlayer(playerItem: item)
+            player.isMuted = false
+            player.volume = JourneyAudioMix.current.explosionVideo
             player.actionAtItemEnd = .pause
+            player.automaticallyWaitsToMinimizeStalling = false
             playerLayer.player = player
-            coordinator.observeEnd(of: item, player: player)
+            coordinator.observeItem(item, player: player)
         }
     }
 }

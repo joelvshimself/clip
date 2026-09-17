@@ -3,6 +3,7 @@
 //  clip
 //
 
+import CoreGraphics
 import Photos
 import PhotosUI
 import SwiftUI
@@ -17,35 +18,28 @@ struct ContentView: View {
     @State private var pickerItem: PhotosPickerItem?
     @State private var showVideoPicker = false
     @State private var isUploadSessionActive = false
+    @State private var isVideoHandoffActive = false
+    @State private var pendingLibraryVideoURL: URL?
     @State private var uploadSessionID = UUID()
 
     private var isVideoPickEnabled: Bool {
-        !isUploadSessionActive
+        !isUploadSessionActive && !isVideoHandoffActive
     }
 
     var body: some View {
-        Group {
-            if journeyPhase != .home {
-                JourneyRootView(journeyPhase: $journeyPhase)
-            } else if isUploadSessionActive {
-                UploadPipelineView(
-                    videoURL: activeUploadURL,
-                    previewImage: activeUploadPreviewImage,
-                    onEnterExporting: startDeferredPersistIfNeeded,
-                    onContinueEditing: endUploadSession,
-                    onSave: endUploadSession
-                )
-                .id(uploadSessionID)
-            } else {
-                HomeView(
-                    libraryVideos: $libraryVideos,
-                    isVideoPickEnabled: isVideoPickEnabled,
-                    onRequestVideoPicker: requestVideoPicker
-                )
+        rootScene
+            .onChange(of: journeyPhase) { _, phase in
+                if phase == .home {
+                    JourneyAudio.stopAll()
+                }
             }
-        }
-        .photosPicker(isPresented: $showVideoPicker, selection: $pickerItem, matching: .videos)
-        .onChange(of: pickerItem) { _, item in
+            .photosPicker(
+                isPresented: $showVideoPicker,
+                selection: $pickerItem,
+                matching: .videos,
+                photoLibrary: .shared()
+            )
+            .onChange(of: pickerItem) { _, item in
             guard let item else { return }
             guard isVideoPickEnabled else {
                 pickerItem = nil
@@ -53,9 +47,11 @@ struct ContentView: View {
             }
             pickerItem = nil
             uploadSessionID = UUID()
-            isUploadSessionActive = true
+            isUploadSessionActive = false
+            isVideoHandoffActive = true
             persistTaskStarted = false
             pendingPersistSourceURL = nil
+            pendingLibraryVideoURL = nil
             activeUploadPreviewImage = nil
             activeUploadURL = nil
             Task {
@@ -64,12 +60,57 @@ struct ContentView: View {
         }
     }
 
+    @ViewBuilder
+    private var rootScene: some View {
+        if journeyPhase != .home {
+            JourneyRootView(journeyPhase: $journeyPhase)
+        } else if isUploadSessionActive {
+            UploadPipelineView(
+                videoURL: activeUploadURL,
+                previewImage: activeUploadPreviewImage,
+                onEnterExporting: startDeferredPersistIfNeeded,
+                onContinueEditing: endUploadSession,
+                onSave: endUploadSession
+            )
+            .id(uploadSessionID)
+        } else {
+            HomeView(
+                libraryVideos: $libraryVideos,
+                isVideoPickEnabled: isVideoPickEnabled,
+                isVideoHandoffActive: isVideoHandoffActive,
+                handoffPreviewImage: activeUploadPreviewImage,
+                handoffVideoURL: activeUploadURL,
+                onHandoffPreviewResolved: handleHandoffPreviewResolved,
+                onVideoHandoffFinished: completeVideoHandoff,
+                onRequestVideoPicker: requestVideoPicker
+            )
+        }
+    }
+
+    private func handleHandoffPreviewResolved(_ image: CGImage) {
+        if activeUploadPreviewImage == nil {
+            activeUploadPreviewImage = image
+        }
+    }
+
+    private func completeVideoHandoff() {
+        guard isVideoHandoffActive else { return }
+        if let pending = pendingLibraryVideoURL {
+            libraryVideos.append(pending)
+            pendingLibraryVideoURL = nil
+        }
+        isVideoHandoffActive = false
+        isUploadSessionActive = true
+    }
+
     private func endUploadSession() {
         activeUploadURL = nil
         activeUploadPreviewImage = nil
         pendingPersistSourceURL = nil
         persistTaskStarted = false
         isUploadSessionActive = false
+        isVideoHandoffActive = false
+        pendingLibraryVideoURL = nil
     }
 
     private func requestVideoPicker() {
@@ -131,8 +172,8 @@ struct ContentView: View {
             await UploadVideoThumbnailLoader.loadPreview(from: item)
         }
 
-        Task { @MainActor in
-            if let image = await thumbnailTask.value {
+        if let image = await thumbnailTask.value {
+            await MainActor.run {
                 activeUploadPreviewImage = image
             }
         }
@@ -140,7 +181,7 @@ struct ContentView: View {
         do {
             guard let picked = try await item.loadTransferable(type: PickedVideoFile.self) else {
                 await MainActor.run {
-                    endUploadSession()
+                    cancelVideoHandoff()
                 }
                 return
             }
@@ -150,7 +191,7 @@ struct ContentView: View {
                 if activeUploadURL == nil {
                     activeUploadURL = sessionURL
                     pendingPersistSourceURL = sessionURL
-                    libraryVideos.append(sessionURL)
+                    pendingLibraryVideoURL = sessionURL
                 }
             }
         } catch {
@@ -158,9 +199,19 @@ struct ContentView: View {
             print("Video import failed:", error.localizedDescription)
             #endif
             await MainActor.run {
-                endUploadSession()
+                cancelVideoHandoff()
             }
         }
+    }
+
+    private func cancelVideoHandoff() {
+        isVideoHandoffActive = false
+        activeUploadURL = nil
+        activeUploadPreviewImage = nil
+        pendingPersistSourceURL = nil
+        pendingLibraryVideoURL = nil
+        persistTaskStarted = false
+        isUploadSessionActive = false
     }
 }
 

@@ -15,10 +15,13 @@ enum RevealArt {
     static let pinchFullSpan: CGFloat = 0.72
     static let snapThreshold: CGFloat = 0.92
     static let snapReleaseThreshold: CGFloat = 0.75
-    static let snapDuration: TimeInterval = 0.75
+    static let snapDuration: TimeInterval = 0.55
+    static let explosionPrewarmProgress: CGFloat = 0.75
     /// How slowly curtains follow the pinch (even if the gesture is fast).
     static let pinchFollowDuration: TimeInterval = 0.52
     static let travelPadding: CGFloat = 48
+    /// Vertical drag distance (one finger) that maps to full reveal progress.
+    static let scrollDistanceForFullOpen: CGFloat = 240
 
     /// `revealProgress` at which curtains are fully parted (`openAmount == 1`).
     static let revealProgressForFullOpen: CGFloat = 1 / manualOpenCap

@@ -11,6 +11,7 @@ struct ManifestoFlashFlowView: View {
 
     @State private var flashIndex = 0
     @State private var sequenceFinished = false
+    @State private var showMemeOrbit = false
     @State private var didReportSettled = false
     @State private var didPlayHandSting = false
 
@@ -18,12 +19,15 @@ struct ManifestoFlashFlowView: View {
         ZStack {
             Color.black
 
-            if !sequenceFinished, flashIndex < ManifestoTiming.flashes.count {
+            if showMemeOrbit {
+                ManifestoMemeOrbitView(containerSize: containerSize, onSettled: reportSettledOnce)
+            } else if !sequenceFinished, flashIndex < ManifestoTiming.flashes.count {
                 let entry = ManifestoTiming.flashes[flashIndex]
                 ManifestoWordFlashView(
                     word: entry.text,
                     isRedBackground: entry.isRedBackground,
-                    showsSilhouette: entry.showsSilhouette
+                    showsSilhouette: entry.showsSilhouette,
+                    handVideoURL: entry.showsHandVideo ? ManifestoMedia.glovePoofHitURL : nil
                 )
                 .id(flashIndex)
             }
@@ -32,6 +36,7 @@ struct ManifestoFlashFlowView: View {
         .ignoresSafeArea()
         .animation(nil, value: flashIndex)
         .animation(nil, value: sequenceFinished)
+        .animation(nil, value: showMemeOrbit)
         .onAppear {
             beginFlashSequence()
         }
@@ -40,6 +45,7 @@ struct ManifestoFlashFlowView: View {
     private func beginFlashSequence() {
         flashIndex = 0
         sequenceFinished = false
+        showMemeOrbit = false
         didReportSettled = false
         didPlayHandSting = false
         onFlashAppeared(at: 0)
@@ -49,6 +55,7 @@ struct ManifestoFlashFlowView: View {
     private func onFlashAppeared(at index: Int) {
         guard index < ManifestoTiming.flashes.count else { return }
         let entry = ManifestoTiming.flashes[index]
+        JourneyAudio.play(entry.isRedBackground ? .flashRed : .flashBlack)
         guard entry.showsSilhouette, !didPlayHandSting else { return }
         didPlayHandSting = true
         ManifestoHandSting.play()
@@ -60,7 +67,7 @@ struct ManifestoFlashFlowView: View {
             let next = index + 1
             if next >= ManifestoTiming.flashes.count {
                 sequenceFinished = true
-                reportSettledOnce()
+                showMemeOrbit = true
             } else {
                 flashIndex = next
                 onFlashAppeared(at: next)
