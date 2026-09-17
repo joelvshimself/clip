@@ -15,9 +15,12 @@ struct JourneyRootView: View {
     @State private var hintBounce = false
     @State private var catLaunched = false
     @State private var journeyStarted = false
-    @State private var showFallingClips = false
     @State private var clipsSettled = false
     @State private var showJourneyCTA = false
+
+    private var showManifestoFlashes: Bool {
+        journeyPhase == .rain || journeyPhase == .cta
+    }
 
     private var openAmount: CGFloat {
         if isFullyOpen { return 1 }
@@ -43,24 +46,31 @@ struct JourneyRootView: View {
 
                 if journeyPhase == .blast, let explosionURL = FallingClipCatalog.explosionURL {
                     AlphaVideoPlayer(url: explosionURL) {
-                        journeyPhase = .wait
-                        scheduleRain(after: JourneyTiming.waitAfterExplosion)
+                        startManifestoFlashes()
                     }
                     .frame(width: width, height: height)
                     .clipped()
                     .allowsHitTesting(false)
                 }
 
-                if showFallingClips {
-                    ScreenStageView(
-                        containerSize: CGSize(width: width, height: height),
-                        showCTA: shouldShowCTA,
-                        onCTA: handleEnterJourney,
-                        onSettled: handleClipsSettled
-                    )
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                if showManifestoFlashes {
+                    ZStack {
+                        ManifestoFlashFlowView(
+                            containerSize: CGSize(width: width, height: height),
+                            onSettled: handleClipsSettled
+                        )
+
+                        if shouldShowCTA {
+                            VStack {
+                                Spacer(minLength: 0)
+                                JourneyCTAButton(action: handleEnterJourney)
+                                    .padding(.horizontal, 36)
+                                    .padding(.bottom, 48)
+                            }
+                        }
+                    }
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
                     .zIndex(5)
-                    .transition(.opacity)
                 }
 
                 if journeyPhase == .idle || journeyPhase == .blast {
@@ -104,8 +114,6 @@ struct JourneyRootView: View {
         .onChange(of: journeyPhase) { _, phase in
             if phase == .home || phase == .idle {
                 DeviceTiltMonitor.shared.stop()
-            } else if phase == .rain || phase == .cta {
-                DeviceTiltMonitor.shared.start()
             }
         }
         .onAppear {
@@ -222,13 +230,9 @@ struct JourneyRootView: View {
         }
     }
 
-    private func scheduleRain(after delay: TimeInterval) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + delay) {
-            guard journeyPhase == .wait else { return }
-            showFallingClips = true
-            journeyPhase = .rain
-            scheduleCTABackup()
-        }
+    private func startManifestoFlashes() {
+        journeyPhase = .rain
+        scheduleCTABackup()
     }
 
     private func scheduleCTABackup() {

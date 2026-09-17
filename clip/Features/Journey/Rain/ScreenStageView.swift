@@ -20,7 +20,7 @@ struct ScreenStageView: View {
         let ctaBottomInset = frame.height * ScreenMockup.displayInsetBottom + 10
 
         ZStack {
-            FallingClipsView(size: display, onSettled: onSettled)
+            ManifestoStageView(size: display, onSettled: onSettled)
             .frame(width: display.width, height: display.height)
             .offset(y: displayOffsetY)
             .clipShape(
