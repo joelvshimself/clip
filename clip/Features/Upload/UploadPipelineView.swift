@@ -31,6 +31,7 @@ struct UploadPipelineView: View {
                 if let videoURL {
                     UploadCompleteStageView(
                         videoURL: videoURL,
+                        previewImage: previewImage,
                         onContinueEditing: onContinueEditing,
                         onSave: onSave
                     )

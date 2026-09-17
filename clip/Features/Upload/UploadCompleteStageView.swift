@@ -7,72 +7,83 @@ import SwiftUI
 
 struct UploadCompleteStageView: View {
     let videoURL: URL
+    var previewImage: CGImage?
     var onContinueEditing: () -> Void
     var onSave: () -> Void
 
+    @State private var resolvedPreview: CGImage?
+
+    private var displayPreview: CGImage? {
+        resolvedPreview ?? previewImage
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            Text("HEre you are, Darling")
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(.white)
-                .padding(.top, 56)
-                .padding(.horizontal, 24)
-
-            Spacer()
-
+        GeometryReader { geometry in
             ZStack {
-                ForEach(0..<4, id: \.self) { layer in
-                    let depth = 3 - layer
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Color(white: 0.35 + Double(depth) * 0.12))
-                        .aspectRatio(0.72, contentMode: .fit)
-                        .scaleEffect(1 - CGFloat(depth) * 0.04)
-                        .offset(x: CGFloat(depth) * 10, y: CGFloat(depth) * 8)
-                        .opacity(layer == 0 ? 1 : 0.55)
-                        .overlay {
-                            if layer == 0 {
-                                LoopingVideoView(url: videoURL)
-                                    .clipShape(RoundedRectangle(cornerRadius: 6, style: .continuous))
-                            } else {
-                                Text("{video}")
-                                    .font(.title3.weight(.medium))
-                                    .foregroundStyle(.black.opacity(0.5))
-                            }
+                if let image = displayPreview {
+                    UploadPreviewCarousel(
+                        previewImage: image,
+                        progress: 1,
+                        maxWidth: geometry.size.width
+                    )
+                    .position(x: geometry.size.width * 0.5, y: geometry.size.height * 0.5)
+                }
+
+                VStack(spacing: 0) {
+                    Spacer()
+
+                    HStack(spacing: 16) {
+                        Button(action: onContinueEditing) {
+                            Text("Continue editing")
+                                .font(.headline.weight(.semibold))
+                                .foregroundStyle(.white)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 16)
+                                .instructionGlassOutlineRoundedRect(cornerRadius: 6)
                         }
+                        .buttonStyle(.plain)
+
+                        PrimaryGlassButton(
+                            title: "Save",
+                            shape: .roundedRect(cornerRadius: 6),
+                            action: onSave
+                        )
+                    }
+                    .padding(.horizontal, 24)
+                    .padding(.bottom, 48)
                 }
             }
-            .padding(.horizontal, 48)
-
-            Spacer()
-
-            HStack(spacing: 16) {
-                Button(action: onContinueEditing) {
-                    Text("Continue editing")
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 16)
-                        .instructionGlassOutlineRoundedRect(cornerRadius: 6)
-                }
-                .buttonStyle(.plain)
-
-                PrimaryGlassButton(
-                    title: "Save",
-                    shape: .roundedRect(cornerRadius: 6),
-                    action: onSave
-                )
-            }
-            .padding(.horizontal, 24)
-            .padding(.bottom, 48)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.black.ignoresSafeArea())
+        .task(id: previewTaskID) {
+            await resolvePreviewIfNeeded()
+        }
+    }
+
+    private var previewTaskID: String {
+        let previewKey = previewImage.map { "\($0.width)x\($0.height)" } ?? "nil"
+        return "\(previewKey)|\(videoURL.absoluteString)"
+    }
+
+    @MainActor
+    private func resolvePreviewIfNeeded() async {
+        if let previewImage {
+            if resolvedPreview == nil {
+                resolvedPreview = previewImage
+            }
+            return
+        }
+        guard resolvedPreview == nil else { return }
+        if let frame = await UploadVideoFirstFrameLoader.load(from: videoURL) {
+            resolvedPreview = frame
+        }
     }
 }
 
 #Preview("Stage Complete") {
     UploadCompleteStageView(
         videoURL: PreviewSupport.sampleVideoURL,
+        previewImage: PreviewSupport.yellowPortraitMockCGImage(),
         onContinueEditing: {},
         onSave: {}
     )
