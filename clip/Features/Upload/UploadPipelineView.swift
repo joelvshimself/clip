@@ -25,7 +25,7 @@ struct UploadPipelineView: View {
                 UploadLoadingStageView(previewImage: previewImage)
                     .transition(.opacity)
             case .exporting:
-                UploadExportingStageView()
+                UploadExportingStageView(previewImage: previewImage, videoURL: videoURL)
                     .transition(.opacity)
             case .complete:
                 if let videoURL {

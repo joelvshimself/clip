@@ -12,9 +12,8 @@ import UIKit
 enum MagicHandoffTiming {
     static let totalDuration: TimeInterval = 3.0
     static let maxPreviewWait: TimeInterval = 5.0
-    static let magnetDelay: TimeInterval = 0.85
-    static let magnetSpringResponse: TimeInterval = 0.82
-    static let magnetSpringDamping: CGFloat = 0.74
+    /// Hold at keyframe 1 (idle spin + bob) before flying into the caja.
+    static let pauseDuration: TimeInterval = 0.85
     static let contactPixelDuration: TimeInterval = 0.22
     static let spinPeriod: TimeInterval = 5.75
     static let bobAmplitude: CGFloat = 12
@@ -28,10 +27,66 @@ enum MagicHandoffLayout {
 
     /// Portrait frame width:height = 9:16
     static let frameAspectHeightOverWidth: CGFloat = 16 / 9
-    static let frameWidthFraction: CGFloat = 0.42
-    static let frameStartYFraction: CGFloat = 1.1
-    static let frameCenterYFraction: CGFloat = 0.5
+    static let frameWidthFraction: CGFloat = 0.34
     static let frameCenterRightNudge: CGFloat = 12
+}
+
+struct MagicHandoffKeyframe {
+    var time: TimeInterval
+    var xFraction: CGFloat
+    var yFraction: CGFloat
+    var scale: CGFloat
+    /// Extra horizontal offset in points (positive = right).
+    var xOffset: CGFloat = 0
+    /// Extra vertical offset in points (positive = down).
+    var yOffset: CGFloat = 0
+}
+
+enum MagicHandoffPath {
+    /// Edit these three keyframes to tune the handoff path.
+    static let keyframes: [MagicHandoffKeyframe] = [
+        // 0: enters from below
+        .init(time: 0.00, xFraction: 0.50, yFraction: 1.25, scale: 1),
+        // 1: pauses briefly (idle)
+        .init(time: 0.55, xFraction: 0.50, yFraction: 1.10, scale: 1),
+        // 2: lands in the caja, 200× smaller
+        .init(
+            time: 1.55,
+            xFraction: 0.50,
+            yFraction: 0.50,
+            scale: 1.0 / 200.0,
+            xOffset: 30,
+            yOffset: 5
+        ),
+    ]
+
+    static func pose(
+        pathProgress: CGFloat,
+        heroWidth: CGFloat,
+        heroHeight: CGFloat
+    ) -> (position: CGPoint, scale: CGFloat) {
+        let clamped = min(max(pathProgress, 0), CGFloat(keyframes.count - 1))
+        let segment = min(Int(floor(clamped)), keyframes.count - 2)
+        let t = clamped - CGFloat(segment)
+        let from = keyframes[segment]
+        let to = keyframes[segment + 1]
+
+        let xFraction = from.xFraction + (to.xFraction - from.xFraction) * t
+        let yFraction = from.yFraction + (to.yFraction - from.yFraction) * t
+        let scale = from.scale + (to.scale - from.scale) * t
+        let xOffset = from.xOffset + (to.xOffset - from.xOffset) * t
+        let yOffset = from.yOffset + (to.yOffset - from.yOffset) * t
+
+        let nudgeT = segment == 1 ? t : (clamped >= 2 ? 1 : 0)
+        let x = heroWidth * xFraction + xOffset + MagicHandoffLayout.frameCenterRightNudge * nudgeT
+        let y = heroHeight * yFraction + yOffset
+
+        return (CGPoint(x: x, y: y), scale)
+    }
+
+    static func segmentDuration(from startIndex: Int, to endIndex: Int) -> TimeInterval {
+        keyframes[endIndex].time - keyframes[startIndex].time
+    }
 }
 
 struct MagicBeginningHandoffView: View {
@@ -41,7 +96,8 @@ struct MagicBeginningHandoffView: View {
     var onFinished: () -> Void
 
     @State private var resolvedPreview: CGImage?
-    @State private var magnetProgress: CGFloat = 0
+    /// 0 = KF0, 1 = KF1, 2 = KF2 (interpolates between keyframes)
+    @State private var pathProgress: CGFloat = 0
     @State private var framePixelAmount: CGFloat = 0
     @State private var sequenceStarted = false
     @State private var didFinish = false
@@ -88,33 +144,29 @@ struct MagicBeginningHandoffView: View {
             let frameWidth = heroWidth * MagicHandoffLayout.frameWidthFraction
             let frameHeight = frameWidth * MagicHandoffLayout.frameAspectHeightOverWidth
 
-            let start = CGPoint(
-                x: heroWidth * 0.5,
-                y: heroHeight * MagicHandoffLayout.frameStartYFraction
-            )
-            let end = CGPoint(
-                x: heroWidth * 0.5 + MagicHandoffLayout.frameCenterRightNudge,
-                y: heroHeight * MagicHandoffLayout.frameCenterYFraction
-            )
-            let position = CGPoint(
-                x: start.x + (end.x - start.x) * magnetProgress,
-                y: start.y + (end.y - start.y) * magnetProgress
+            let pose = MagicHandoffPath.pose(
+                pathProgress: pathProgress,
+                heroWidth: heroWidth,
+                heroHeight: heroHeight
             )
 
             TimelineView(.animation) { timeline in
                 let t = timeline.date.timeIntervalSinceReferenceDate
                 let bob = sin(t * (2 * .pi / MagicHandoffTiming.bobPeriod)) * MagicHandoffTiming.bobAmplitude
                 let spin = (t / MagicHandoffTiming.spinPeriod).truncatingRemainder(dividingBy: 1) * 360
-                let idleBob = magnetProgress < 0.02 ? bob : 0
-                let spinAmount = magnetProgress < 0.95 ? spin : spin * (1 - magnetProgress)
+                let atPause = abs(pathProgress - 1) < 0.04
+                let idleBob = atPause ? bob : 0
+                let flyProgress = max(0, min(1, pathProgress - 1))
+                let spinAmount = flyProgress < 0.95 ? spin : spin * (1 - flyProgress)
 
                 frameContent(previewImage: previewImage, width: frameWidth, height: frameHeight)
+                    .scaleEffect(pose.scale)
                     .rotation3DEffect(.degrees(spinAmount), axis: (x: 0, y: 1, z: 0), perspective: 0.65)
                     .layerEffect(
                         LoadingCatPixelation.shader(amount: framePixelAmount),
                         maxSampleOffset: LoadingCatPixelation.maxSampleOffset
                     )
-                    .position(x: position.x, y: position.y + idleBob)
+                    .position(x: pose.position.x, y: pose.position.y + idleBob)
             }
         }
     }
@@ -175,19 +227,19 @@ struct MagicBeginningHandoffView: View {
     private func runHandoffBeat() async {
         guard !didFinish else { return }
 
-        try? await Task.sleep(for: .seconds(MagicHandoffTiming.magnetDelay))
-
-        withAnimation(
-            .spring(
-                response: MagicHandoffTiming.magnetSpringResponse,
-                dampingFraction: MagicHandoffTiming.magnetSpringDamping
-            )
-        ) {
-            magnetProgress = 1
+        let entryDuration = MagicHandoffPath.segmentDuration(from: 0, to: 1)
+        withAnimation(.easeInOut(duration: entryDuration)) {
+            pathProgress = 1
         }
+        try? await Task.sleep(for: .seconds(entryDuration))
 
-        let magnetAnim = MagicHandoffTiming.magnetSpringResponse + 0.15
-        try? await Task.sleep(for: .seconds(magnetAnim))
+        try? await Task.sleep(for: .seconds(MagicHandoffTiming.pauseDuration))
+
+        let flyDuration = MagicHandoffPath.segmentDuration(from: 1, to: 2)
+        withAnimation(.easeInOut(duration: flyDuration)) {
+            pathProgress = 2
+        }
+        try? await Task.sleep(for: .seconds(flyDuration))
 
         withAnimation(.easeOut(duration: MagicHandoffTiming.contactPixelDuration)) {
             framePixelAmount = 1
@@ -197,7 +249,11 @@ struct MagicBeginningHandoffView: View {
             framePixelAmount = 0
         }
 
-        let elapsed = MagicHandoffTiming.magnetDelay + magnetAnim + MagicHandoffTiming.contactPixelDuration * 2
+        let elapsed =
+            entryDuration
+            + MagicHandoffTiming.pauseDuration
+            + flyDuration
+            + MagicHandoffTiming.contactPixelDuration * 2
         let remaining = max(0, MagicHandoffTiming.totalDuration - elapsed)
         try? await Task.sleep(for: .seconds(remaining))
 
