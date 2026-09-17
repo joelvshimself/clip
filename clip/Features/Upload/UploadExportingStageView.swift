@@ -28,19 +28,13 @@ enum UploadExportingLayout {
 
 struct UploadExportingStageView: View {
     var previewImage: CGImage? = nil
-    var videoURL: URL? = nil
 
-    @State private var resolvedPreview: CGImage?
     @State private var catPixelAmount: Double = 0
     @State private var showVomitLayers = false
     /// Mouth → center carousel, scale/fan, Felix exit upward.
     @State private var revealProgress: CGFloat = 0
     @State private var sequenceStarted = false
     @State private var vomitSoundPlayer: AVAudioPlayer?
-
-    private var displayPreview: CGImage? {
-        resolvedPreview ?? previewImage
-    }
 
     var body: some View {
         GeometryReader { geometry in
@@ -55,7 +49,7 @@ struct UploadExportingStageView: View {
                 * UploadExportingTiming.visibleCatHeightFraction
             let felixLift = screenSize.height * UploadExportingLayout.felixExitTravelFraction * revealProgress
             let mouthY = visibleHeight * UploadExportingTiming.mouthStartFraction
-            let centerY = screenSize.height * 0.5
+            let centerY = screenSize.height * 0.42
             let carouselY = mouthY + (centerY - mouthY) * revealProgress
 
             ZStack {
@@ -75,7 +69,7 @@ struct UploadExportingStageView: View {
                 }
                 .zIndex(0)
 
-                if showVomitLayers, let image = displayPreview {
+                if showVomitLayers, let image = previewImage {
                     UploadPreviewCarousel(
                         previewImage: image,
                         progress: revealProgress,
@@ -103,18 +97,9 @@ struct UploadExportingStageView: View {
                 }
             }
         }
-        .task(id: previewTaskID) {
-            await resolvePreviewIfNeeded()
-        }
         .task {
             await runExportBeatIfNeeded()
         }
-    }
-
-    private var previewTaskID: String {
-        let previewKey = previewImage.map { "\($0.width)x\($0.height)" } ?? "nil"
-        let urlKey = videoURL?.absoluteString ?? "nil"
-        return "\(previewKey)|\(urlKey)"
     }
 
     @ViewBuilder
@@ -189,20 +174,6 @@ struct UploadExportingStageView: View {
                 LoadingCatPixelation.shader(amount: catPixelAmount),
                 maxSampleOffset: LoadingCatPixelation.maxSampleOffset
             )
-    }
-
-    @MainActor
-    private func resolvePreviewIfNeeded() async {
-        if let previewImage {
-            if resolvedPreview == nil {
-                resolvedPreview = previewImage
-            }
-            return
-        }
-        guard resolvedPreview == nil, let videoURL else { return }
-        if let frame = await UploadVideoFirstFrameLoader.load(from: videoURL) {
-            resolvedPreview = frame
-        }
     }
 
     @MainActor

@@ -12,6 +12,7 @@ enum PrimaryGlassButtonShape {
 
 struct PrimaryGlassButton: View {
     let title: String
+    var leadingImageName: String? = nil
     var shape: PrimaryGlassButtonShape = .roundedRect(cornerRadius: 14)
     var isEnabled: Bool = true
     let action: () -> Void
@@ -27,22 +28,34 @@ struct PrimaryGlassButton: View {
 
     @ViewBuilder
     private var label: some View {
-        let text = Text(title)
-            .font(.headline.weight(.semibold))
-            .foregroundStyle(.white)
-            .shadow(color: .black.opacity(0.45), radius: 2, y: 1)
-
         switch shape {
         case .capsule:
-            text
+            labelContent
                 .padding(.horizontal, 28)
                 .padding(.vertical, 16)
                 .instructionGlassCapsule()
         case .roundedRect(let cornerRadius):
-            text
+            labelContent
                 .frame(maxWidth: .infinity)
-                .padding(.vertical, 18)
+                .padding(.vertical, 15)
                 .instructionGlassRoundedRect(cornerRadius: cornerRadius)
         }
+    }
+
+    private var labelContent: some View {
+        HStack(spacing: 7) {
+            if let leadingImageName {
+                Image(leadingImageName)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 47.4, height: 47.4)
+            }
+
+            Text(title)
+                .font(.headline.weight(.semibold))
+                .foregroundStyle(.white)
+                .shadow(color: .black.opacity(0.45), radius: 2, y: 1)
+        }
+        .frame(height: 22)
     }
 }

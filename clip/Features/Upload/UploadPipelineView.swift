@@ -7,9 +7,7 @@ import AVFoundation
 import SwiftUI
 
 struct UploadPipelineView: View {
-    let videoURL: URL?
     var previewImage: CGImage?
-    var onEnterExporting: () -> Void = {}
     var onContinueEditing: () -> Void
     var onSave: () -> Void
 
@@ -25,12 +23,11 @@ struct UploadPipelineView: View {
                 UploadLoadingStageView(previewImage: previewImage)
                     .transition(.opacity)
             case .exporting:
-                UploadExportingStageView(previewImage: previewImage, videoURL: videoURL)
+                UploadExportingStageView(previewImage: previewImage)
                     .transition(.opacity)
             case .complete:
-                if let videoURL {
+                if let previewImage {
                     UploadCompleteStageView(
-                        videoURL: videoURL,
                         previewImage: previewImage,
                         onContinueEditing: onContinueEditing,
                         onSave: onSave
@@ -46,12 +43,11 @@ struct UploadPipelineView: View {
             loadingStartedAt = Date()
             startStageAutomationIfNeeded()
         }
-        .onChange(of: videoURL) { _, _ in
+        .onChange(of: previewImage) { _, _ in
             startStageAutomationIfNeeded()
         }
         .onChange(of: stage) { _, newStage in
             if newStage == .exporting {
-                onEnterExporting()
                 playExportMemeSound()
             }
         }
@@ -69,7 +65,7 @@ struct UploadPipelineView: View {
     private func runStageAutomation() async {
         let minLoadingEnd = loadingStartedAt.addingTimeInterval(UploadPipelineTiming.loadingDuration)
 
-        while Date() < minLoadingEnd || videoURL == nil {
+        while Date() < minLoadingEnd || previewImage == nil {
             try? await Task.sleep(for: .milliseconds(50))
             if Task.isCancelled { return }
         }
@@ -78,7 +74,7 @@ struct UploadPipelineView: View {
         stage = .exporting
 
         try? await Task.sleep(for: .seconds(UploadPipelineTiming.exportingDuration))
-        guard stage == .exporting, videoURL != nil else { return }
+        guard stage == .exporting, previewImage != nil else { return }
         stage = .complete
     }
 
@@ -93,7 +89,7 @@ struct UploadPipelineView: View {
 
 #Preview("Upload Pipeline") {
     UploadPipelineView(
-        videoURL: PreviewSupport.sampleVideoURL,
+        previewImage: PreviewSupport.yellowPortraitMockCGImage(),
         onContinueEditing: {},
         onSave: {}
     )
@@ -101,7 +97,7 @@ struct UploadPipelineView: View {
 
 #Preview("Upload Pipeline Preparing") {
     UploadPipelineView(
-        videoURL: nil,
+        previewImage: nil,
         onContinueEditing: {},
         onSave: {}
     )

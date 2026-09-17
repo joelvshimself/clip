@@ -7,16 +7,15 @@ import CoreGraphics
 import SwiftUI
 
 struct HomeView: View {
-    @Binding var libraryVideos: [URL]
+    @Binding var libraryVideos: [LibraryVideoItem]
     var isVideoPickEnabled: Bool = true
     var isVideoHandoffActive: Bool = false
     var handoffPreviewImage: CGImage?
-    var handoffVideoURL: URL?
     var onHandoffPreviewResolved: (CGImage) -> Void = { _ in }
     var onVideoHandoffFinished: () -> Void = {}
     var onRequestVideoPicker: () -> Void = {}
 
-    private let addTileMarker = URL(fileURLWithPath: "/add-video-tile")
+    private let addTileMarker = UUID(uuidString: "00000000-0000-0000-0000-000000000001")!
 
     var body: some View {
         ZStack {
@@ -45,7 +44,6 @@ struct HomeView: View {
                 if isVideoHandoffActive {
                     MagicBeginningHandoffView(
                         previewImage: handoffPreviewImage,
-                        videoURL: handoffVideoURL,
                         onPreviewResolved: onHandoffPreviewResolved,
                         onFinished: onVideoHandoffFinished
                     )
@@ -85,7 +83,7 @@ struct HomeView: View {
     private var headerSection: some View {
         ZStack(alignment: .top) {
             if let first = libraryVideos.first {
-                LoopingVideoView(url: first)
+                VideoPosterImageView(posterImage: first.posterImage, cornerRadius: 0)
                     .frame(height: 220)
                     .clipped()
             } else {
@@ -125,11 +123,11 @@ struct HomeView: View {
         return HStack(alignment: .top, spacing: 8) {
             ForEach(0..<3, id: \.self) { columnIndex in
                 VStack(spacing: 8) {
-                    ForEach(columns[columnIndex], id: \.self) { url in
-                        if url == addTileMarker {
+                    ForEach(columns[columnIndex]) { entry in
+                        if entry.id == addTileMarker {
                             addVideoTile
-                        } else {
-                            videoTile(url: url)
+                        } else if let item = libraryVideos.first(where: { $0.id == entry.id }) {
+                            videoTile(item: item)
                         }
                     }
                 }
@@ -156,9 +154,9 @@ struct HomeView: View {
         .opacity(isVideoPickEnabled ? 1 : 0.45)
     }
 
-    private func videoTile(url: URL) -> some View {
-        LoopingVideoView(url: url)
-            .frame(height: tileHeight(for: url))
+    private func videoTile(item: LibraryVideoItem) -> some View {
+        VideoPosterImageView(posterImage: item.posterImage)
+            .frame(height: tileHeight(for: item))
             .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
             .overlay {
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
@@ -166,28 +164,35 @@ struct HomeView: View {
             }
     }
 
-    private func tileHeight(for url: URL) -> CGFloat {
-        let hash = abs(url.absoluteString.hashValue)
+    private func tileHeight(for item: LibraryVideoItem) -> CGFloat {
+        let hash = abs(item.id.hashValue)
         let options: [CGFloat] = [120, 150, 180, 210]
         return options[hash % options.count]
     }
 
-    private func masonryColumns() -> [[URL]] {
-        var columns: [[URL]] = [[], [], []]
-        let items = libraryVideos + [addTileMarker]
-        for (index, url) in items.enumerated() {
-            columns[index % 3].append(url)
+    private struct GridEntry: Identifiable {
+        let id: UUID
+    }
+
+    private func masonryColumns() -> [[GridEntry]] {
+        var columns: [[GridEntry]] = [[], [], []]
+        let items = libraryVideos.map { GridEntry(id: $0.id) } + [GridEntry(id: addTileMarker)]
+        for (index, entry) in items.enumerated() {
+            columns[index % 3].append(entry)
         }
         return columns
     }
 }
 
 #Preview("Home Empty") {
-    @Previewable @State var videos: [URL] = []
+    @Previewable @State var videos: [LibraryVideoItem] = []
     HomeView(libraryVideos: $videos)
 }
 
 #Preview("Home Filled") {
-    @Previewable @State var videos: [URL] = FallingClipCatalog.urls
+    @Previewable @State var videos: [LibraryVideoItem] = {
+        guard let image = PreviewSupport.yellowPortraitMockCGImage() else { return [] }
+        return (0..<6).map { _ in LibraryVideoItem(posterImage: image) }
+    }()
     HomeView(libraryVideos: $videos)
 }

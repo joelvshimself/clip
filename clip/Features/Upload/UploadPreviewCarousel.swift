@@ -10,13 +10,13 @@ import UIKit
 #endif
 
 enum UploadPreviewCarouselLayout {
-    static let widthFraction: CGFloat = 0.44
+    static let widthFraction: CGFloat = 0.52
     static let heightOverWidth: CGFloat = 16 / 9
-    static let startWidthFraction: CGFloat = 0.34
-    static let cornerRadius: CGFloat = 10
-    static let layerCount = 4
-    static let scaleStepPerDepth: CGFloat = 0.04
-    static let verticalStepPerDepth: CGFloat = 10
+    static let startWidthFraction: CGFloat = 0.38
+    static let cornerRadius: CGFloat = 12
+    static let layerCount = 5
+    static let scalePerDepth: CGFloat = 0.8
+    static let verticalStepFraction: CGFloat = 0.031
 }
 
 struct UploadPreviewCarousel: View {
@@ -44,8 +44,10 @@ struct UploadPreviewCarousel: View {
     }
 
     private var stackTopPadding: CGFloat {
-        CGFloat(UploadPreviewCarouselLayout.layerCount - 1)
-            * UploadPreviewCarouselLayout.verticalStepPerDepth
+        let maximumDepth = CGFloat(UploadPreviewCarouselLayout.layerCount - 1)
+        return cardHeight
+            * maximumDepth
+            * UploadPreviewCarouselLayout.verticalStepFraction
             * tier
     }
 
@@ -54,21 +56,56 @@ struct UploadPreviewCarousel: View {
             ForEach(0 ..< UploadPreviewCarouselLayout.layerCount, id: \.self) { layer in
                 let depth = UploadPreviewCarouselLayout.layerCount - 1 - layer
 
-                previewCard
-                    .scaleEffect(1 - CGFloat(depth) * UploadPreviewCarouselLayout.scaleStepPerDepth * tier, anchor: .bottom)
-                    .offset(y: -CGFloat(depth) * UploadPreviewCarouselLayout.verticalStepPerDepth * tier)
+                card(atDepth: depth)
+                    .scaleEffect(
+                        layerScale(depth: depth),
+                        anchor: .top
+                    )
+                    .offset(
+                        y: -CGFloat(depth)
+                            * cardHeight
+                            * UploadPreviewCarouselLayout.verticalStepFraction
+                            * tier
+                    )
                     .opacity(cardOpacity(depth: depth))
                     .zIndex(Double(layer))
             }
         }
-        .frame(width: cardWidth, height: cardHeight + stackTopPadding)
+        .frame(width: cardWidth, height: cardHeight + stackTopPadding, alignment: .bottom)
+    }
+
+    private func layerScale(depth: Int) -> CGFloat {
+        let finalScale = pow(UploadPreviewCarouselLayout.scalePerDepth, CGFloat(depth))
+        return 1 + (finalScale - 1) * tier
     }
 
     private func cardOpacity(depth: Int) -> Double {
         if depth == 0 { return 1 }
-        let bases: [Double] = [0, 0.55, 0.50, 0.45]
+        let bases: [Double] = [0, 0.94, 0.90, 0.86, 0.82]
         let base = bases[min(depth, bases.count - 1)]
         return base * Double(tier)
+    }
+
+    @ViewBuilder
+    private func card(atDepth depth: Int) -> some View {
+        if depth == 0 {
+            previewCard
+        } else {
+            placeholderCard(depth: depth)
+        }
+    }
+
+    @ViewBuilder
+    private func placeholderCard(depth: Int) -> some View {
+        let gray = 0.62 - CGFloat(depth) * 0.06
+        RoundedRectangle(cornerRadius: UploadPreviewCarouselLayout.cornerRadius, style: .continuous)
+            .fill(Color(white: gray))
+            .frame(width: cardWidth, height: cardHeight)
+            .overlay {
+                RoundedRectangle(cornerRadius: UploadPreviewCarouselLayout.cornerRadius, style: .continuous)
+                    .strokeBorder(.white.opacity(0.35), lineWidth: 2)
+            }
+            .shadow(color: .black.opacity(0.35), radius: 10, y: 4)
     }
 
     @ViewBuilder

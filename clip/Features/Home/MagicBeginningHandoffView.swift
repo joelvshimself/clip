@@ -91,7 +91,6 @@ enum MagicHandoffPath {
 
 struct MagicBeginningHandoffView: View {
     let previewImage: CGImage?
-    var videoURL: URL?
     var onPreviewResolved: (CGImage) -> Void = { _ in }
     var onFinished: () -> Void
 
@@ -131,9 +130,7 @@ struct MagicBeginningHandoffView: View {
     }
 
     private var previewTaskID: String {
-        let previewKey = previewImage.map { "\($0.width)x\($0.height)" } ?? "nil"
-        let urlKey = videoURL?.absoluteString ?? "nil"
-        return "\(previewKey)|\(urlKey)"
+        previewImage.map { "\($0.width)x\($0.height)" } ?? "nil"
     }
 
     @ViewBuilder
@@ -192,17 +189,10 @@ struct MagicBeginningHandoffView: View {
 
     @MainActor
     private func resolvePreviewIfNeeded() async {
-        if let previewImage {
-            if resolvedPreview == nil {
-                resolvedPreview = previewImage
-                onPreviewResolved(previewImage)
-            }
-            return
-        }
-        guard resolvedPreview == nil, let videoURL else { return }
-        if let frame = await UploadVideoFirstFrameLoader.load(from: videoURL) {
-            resolvedPreview = frame
-            onPreviewResolved(frame)
+        guard let previewImage else { return }
+        if resolvedPreview == nil {
+            resolvedPreview = previewImage
+            onPreviewResolved(previewImage)
         }
     }
 
@@ -268,7 +258,7 @@ struct MagicBeginningHandoffView: View {
 }
 
 #Preview {
-    MagicBeginningHandoffView(previewImage: nil, videoURL: nil, onFinished: {})
+    MagicBeginningHandoffView(previewImage: nil, onFinished: {})
         .padding()
         .background(Color.black)
 }

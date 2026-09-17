@@ -1,8 +1,9 @@
 //
-//  UploadVideoThumbnailLoader.swift
+//  VideoPosterFrameLoader.swift
 //  clip
 //
 
+import CoreGraphics
 import Photos
 import PhotosUI
 import SwiftUI
@@ -11,8 +12,12 @@ import SwiftUI
 import UIKit
 #endif
 
-enum UploadVideoThumbnailLoader {
-    /// Small preview from the Photos library without reading the full video file.
+/// Lightweight poster extraction for uploads and library tiles — no full video import or transcode.
+enum VideoPosterFrameLoader {
+    static let maxPixelWidth: CGFloat = 480
+    static let maxPixelHeight: CGFloat = 680
+
+    /// Single bounded frame from the Photos library asset backing a picker item.
     static func loadPreview(from item: PhotosPickerItem) async -> CGImage? {
         #if !os(iOS)
         return nil
@@ -23,7 +28,7 @@ enum UploadVideoThumbnailLoader {
 
         return await withCheckedContinuation { continuation in
             let options = PHImageRequestOptions()
-            options.deliveryMode = .opportunistic
+            options.deliveryMode = .highQualityFormat
             options.resizeMode = .fast
             options.isNetworkAccessAllowed = true
             options.isSynchronous = false
@@ -31,7 +36,7 @@ enum UploadVideoThumbnailLoader {
             var resumed = false
             PHImageManager.default().requestImage(
                 for: asset,
-                targetSize: CGSize(width: 480, height: 680),
+                targetSize: CGSize(width: maxPixelWidth, height: maxPixelHeight),
                 contentMode: .aspectFill,
                 options: options
             ) { image, info in
@@ -40,7 +45,7 @@ enum UploadVideoThumbnailLoader {
                     resumed = true
                     continuation.resume(returning: nil)
                     #if DEBUG
-                    print("Upload preview thumbnail failed:", error.localizedDescription)
+                    print("Video poster frame failed:", error.localizedDescription)
                     #endif
                     return
                 }
