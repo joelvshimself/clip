@@ -3,7 +3,6 @@
 //  clip
 //
 
-import AVFoundation
 import SwiftUI
 
 #if canImport(UIKit)
@@ -34,7 +33,6 @@ struct UploadExportingStageView: View {
     /// Mouth → center carousel, scale/fan, Felix exit upward.
     @State private var revealProgress: CGFloat = 0
     @State private var sequenceStarted = false
-    @State private var vomitSoundPlayer: AVAudioPlayer?
 
     var body: some View {
         GeometryReader { geometry in
@@ -201,32 +199,7 @@ struct UploadExportingStageView: View {
     }
 
     private func playVomitCongratulations() {
-        let subdirectories = [
-            "Resources/Media",
-            "Media",
-            nil as String?,
-        ]
-        var soundURL: URL?
-        for subdirectory in subdirectories {
-            if let subdirectory {
-                soundURL = Bundle.main.url(
-                    forResource: "congratulations",
-                    withExtension: "wav",
-                    subdirectory: subdirectory
-                )
-            } else {
-                soundURL = Bundle.main.url(forResource: "congratulations", withExtension: "wav")
-            }
-            if soundURL != nil { break }
-        }
-
-        if let soundURL {
-            vomitSoundPlayer = try? AVAudioPlayer(contentsOf: soundURL)
-            vomitSoundPlayer?.play()
-            return
-        }
-
-        JourneyAudio.play(.ctaResolve)
+        JourneyAudio.play(.handSting)
     }
 }
 

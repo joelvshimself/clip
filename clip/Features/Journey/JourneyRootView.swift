@@ -268,6 +268,7 @@ struct JourneyRootView: View {
         JourneyAudio.prepareSession()
         journeyStarted = true
         journeyPhase = .blast
+        JourneyAudio.play(.explosion)
         withAnimation(.easeOut(duration: JourneyTiming.catLaunchDuration)) {
             catLaunched = true
         }

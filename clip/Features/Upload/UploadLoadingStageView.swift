@@ -38,6 +38,7 @@ struct UploadLoadingStageView: View {
             try? await Task.sleep(for: .seconds(tickInterval))
             guard !Task.isCancelled else { return }
 
+            JourneyAudio.play(.morph)
             withAnimation(.easeIn(duration: pixelInDuration)) {
                 catPixelAmount = 1
             }

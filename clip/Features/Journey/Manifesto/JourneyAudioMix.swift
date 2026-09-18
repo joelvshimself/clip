@@ -6,12 +6,12 @@
 import Foundation
 
 struct JourneyAudioMix: Equatable {
-    var curtainSnap: Float = 0.55
-    var explosionVideo: Float = 1.0
-    var flashRed: Float = 0.5
+    var curtainSnap: Float = 0.97
+    var explosionVideo: Float = 1.9
+    var flashRed: Float = 1.9
     var flashBlack: Float = 0.45
-    var handSting: Float = 0.85
-    var memeStep: Float = 0.78
+    var handSting: Float = 1.85
+    var memeStep: Float = 1.78
     var ringSwell: Float = 0.45
     var catResolve: Float = 0.5
     var morph: Float = 0.65

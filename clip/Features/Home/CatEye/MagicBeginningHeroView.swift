@@ -10,9 +10,9 @@ struct MagicBeginningHeroView: View {
         Image("CatOcaja1")
             .resizable()
             .scaledToFit()
-            .scaleEffect(0.7)
+            .scaleEffect(0.82)
             .frame(maxWidth: .infinity)
-            .offset(y: 28)
+            .offset(y: 44)
     }
 }
 

@@ -56,6 +56,13 @@ struct ManifestoFlashFlowView: View {
         guard index < ManifestoTiming.flashes.count else { return }
         let entry = ManifestoTiming.flashes[index]
         JourneyAudio.play(entry.isRedBackground ? .flashRed : .flashBlack)
+        if entry.text == "your" {
+            DispatchQueue.main.asyncAfter(deadline: .now() + ManifestoTiming.punchAfterYourDelay) {
+                let scale = ManifestoTiming.punchAfterYourHandStingScale
+                let volume = JourneyAudioMix.current.handSting * scale
+                JourneyAudio.play(.handSting, volumeOverride: volume)
+            }
+        }
         guard entry.showsSilhouette, !didPlayHandSting else { return }
         didPlayHandSting = true
         ManifestoHandSting.play()

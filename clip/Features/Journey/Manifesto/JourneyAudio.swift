@@ -38,9 +38,17 @@ enum JourneyAudio {
         pruneFinishedPlayers()
 
         guard let url = url(for: cue) else { return }
-        guard let player = try? AVAudioPlayer(contentsOf: url) else { return }
+        let targetVolume = volumeOverride ?? volume(for: cue)
+        playURL(url, volume: min(1, targetVolume))
+        if targetVolume > 1 {
+            playURL(url, volume: min(1, targetVolume - 1))
+        }
+    }
 
-        player.volume = volumeOverride ?? volume(for: cue)
+    private static func playURL(_ url: URL, volume: Float) {
+        guard volume > 0 else { return }
+        guard let player = try? AVAudioPlayer(contentsOf: url) else { return }
+        player.volume = volume
         player.prepareToPlay()
         player.play()
         activePlayers.append(player)

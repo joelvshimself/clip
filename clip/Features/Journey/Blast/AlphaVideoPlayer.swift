@@ -113,7 +113,7 @@ struct AlphaVideoPlayer: UIViewRepresentable {
             let item = ExplosionPlaybackCache.playerItem(for: url)
             let player = AVPlayer(playerItem: item)
             player.isMuted = false
-            player.volume = JourneyAudioMix.current.explosionVideo
+            player.volume = min(1, JourneyAudioMix.current.explosionVideo)
             player.actionAtItemEnd = .pause
             player.automaticallyWaitsToMinimizeStalling = false
             playerLayer.player = player

@@ -157,7 +157,7 @@ struct JourneyAudioTuningLabView: View {
 
     private func sliderRow(volume: Binding<Float>) -> some View {
         HStack(spacing: 10) {
-            Slider(value: volume, in: 0...1, step: 0.01)
+            Slider(value: volume, in: 0...1.5, step: 0.01)
             Text(String(format: "%.2f", volume.wrappedValue))
                 .font(.caption.monospacedDigit())
                 .frame(width: 40, alignment: .trailing)
@@ -195,5 +195,9 @@ struct JourneyAudioTuningLabView: View {
 }
 
 #Preview("Journey audio mix") {
+    SoundEffectsPreviewView()
+}
+
+#Preview("Journey audio mix (legacy)") {
     JourneyAudioTuningLabView()
 }

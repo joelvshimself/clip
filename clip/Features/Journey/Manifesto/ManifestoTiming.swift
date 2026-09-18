@@ -18,6 +18,9 @@ enum ManifestoTiming {
     static let flashDuration: TimeInterval = 0.3
     static let handFlashDuration: TimeInterval = 1.0
     static let handWordVideoDuration: TimeInterval = 2.0
+    /// Punch hit after the “your” flash, leading into the hand glove video.
+    static let punchAfterYourDelay: TimeInterval = 1.3
+    static let punchAfterYourHandStingScale: Float = 0.55
 
     static let flashes: [ManifestoFlashEntry] = [
         ManifestoFlashEntry(text: "all", isRedBackground: true),

@@ -22,8 +22,8 @@ enum MagicHandoffTiming {
 
 enum MagicHandoffLayout {
     static let cajaAspect: CGFloat = 1024 / 881
-    static let cajaScale: CGFloat = 0.7
-    static let cajaVerticalOffset: CGFloat = 28
+    static let cajaScale: CGFloat = 0.82
+    static let cajaVerticalOffset: CGFloat = 44
 
     /// Portrait frame width:height = 9:16
     static let frameAspectHeightOverWidth: CGFloat = 16 / 9
