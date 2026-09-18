@@ -20,6 +20,14 @@ struct UploadCompleteStageView: View {
                 )
                 .position(x: geometry.size.width * 0.5, y: geometry.size.height * 0.42)
 
+                Text("Here you have, Darling")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.92))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .padding(.top, 20)
+
                 VStack(spacing: 0) {
                     Spacer()
 

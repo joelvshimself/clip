@@ -53,6 +53,16 @@ struct LoadingCatPlacementContent: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity)
 
+            if !showTuningLabel {
+                Text("loading your clips, Darling")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.white.opacity(0.92))
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 24)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                    .padding(.top, 20)
+            }
+
             if showTuningLabel {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(assetName)
